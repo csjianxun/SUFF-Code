@@ -25,6 +25,8 @@ MatchingCommand::MatchingCommand(const int argc, char **argv) : CommandParser(ar
     options_key[OptionKeyword::SUFFK] = "-suff_k";
     options_key[OptionKeyword::CreateFilter] = "-createf";
     options_key[OptionKeyword::SUFFAlpha] = "-alpha";
+    options_key[OptionKeyword::UseCache] = "-use_cache";
+    options_key[OptionKeyword::SUFFSelector] = "-selector";
     processOptions();
 };
 
@@ -85,4 +87,10 @@ void MatchingCommand::processOptions() {
 
     // alpha
     options_value[OptionKeyword::SUFFAlpha] = getCommandOption(options_key[OptionKeyword::SUFFAlpha]);
+
+    // use cache
+    options_value[OptionKeyword::UseCache] = getCommandOption(options_key[OptionKeyword::UseCache]);
+
+    // alpha
+    options_value[OptionKeyword::SUFFSelector] = getCommandOption(options_key[OptionKeyword::SUFFSelector]);
 }

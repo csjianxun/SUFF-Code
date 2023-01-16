@@ -11,19 +11,19 @@
 
 class GenerateFilteringPlan {
 public:
-    static void generateTSOFilterPlan(const Graph *data_graph, const Graph *query_graph, TreeNode *&tree,
-                                           VertexID *&order);
-    static void generateCFLFilterPlan(const Graph *data_graph, const Graph *query_graph, TreeNode *&tree,
-                                      VertexID *&order, int &level_count, ui *&level_offset);
-    static void generateDPisoFilterPlan(const Graph *data_graph, const Graph *query_graph, TreeNode *&tree,
-                                        VertexID *&order);
-    static void generateCECIFilterPlan(const Graph *data_graph, const Graph *query_graph, TreeNode *&tree,
-                                       VertexID *&order);
+    static void generateTSOFilterPlan(const graph_ptr data_graph, const graph_ptr query_graph, TreeNodeArray &tree,
+                                           UIntArray &order);
+    static void generateCFLFilterPlan(const graph_ptr data_graph, const graph_ptr query_graph, TreeNodeArray &tree,
+                                      UIntArray &order, int &level_count, UIntArray &level_offset);
+    static void generateDPisoFilterPlan(const graph_ptr data_graph, const graph_ptr query_graph, TreeNodeArray &tree,
+                                        UIntArray &order);
+    static void generateCECIFilterPlan(const graph_ptr data_graph, const graph_ptr query_graph, TreeNodeArray &tree,
+                                       UIntArray &order);
 private:
-    static VertexID selectTSOFilterStartVertex(const Graph *data_graph, const Graph *query_graph);
-    static VertexID selectCFLFilterStartVertex(const Graph *data_graph, const Graph *query_graph);
-    static VertexID selectDPisoStartVertex(const Graph *data_graph, const Graph *query_graph);
-    static VertexID selectCECIStartVertex(const Graph *data_graph, const Graph *query_graph);
+    static VertexID selectTSOFilterStartVertex(const graph_ptr data_graph, const graph_ptr query_graph);
+    static VertexID selectCFLFilterStartVertex(const graph_ptr data_graph, const graph_ptr query_graph);
+    static VertexID selectDPisoStartVertex(const graph_ptr data_graph, const graph_ptr query_graph);
+    static VertexID selectCECIStartVertex(const graph_ptr data_graph, const graph_ptr query_graph);
 };
 
 

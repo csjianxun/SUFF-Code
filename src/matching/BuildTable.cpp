@@ -1,7 +1,3 @@
-//
-// Created by ssunah on 11/20/18.
-//
-
 #include "BuildTable.h"
 #include <vector>
 #include <algorithm>
@@ -10,12 +6,11 @@
 BSRGraph*** BuildTable::qfliter_bsr_graph_;
 #endif
 
-void BuildTable::buildTables(const Graph *data_graph, const Graph *query_graph, ui **candidates, ui *candidates_count,
-                             Edges ***edge_matrix) {
+void BuildTable::buildTables(const graph_ptr data_graph, const graph_ptr query_graph, UIntMatrix &candidates, UIntArray &candidates_count,
+                             EdgesPtrMatrix &edge_matrix) {
     ui query_vertices_num = query_graph->getVerticesCount();
-    ui* flag = new ui[data_graph->getVerticesCount()];
-    ui* updated_flag = new ui[data_graph->getVerticesCount()];
-    std::fill(flag, flag + data_graph->getVerticesCount(), 0);
+    UIntArray flag(data_graph->getVerticesCount(), 0);
+    UIntArray updated_flag(data_graph->getVerticesCount());
 
     for (ui i = 0; i < query_vertices_num; ++i) {
         for (ui j = 0; j < query_vertices_num; ++j) {
@@ -57,14 +52,14 @@ void BuildTable::buildTables(const Graph *data_graph, const Graph *query_graph, 
                 }
             }
 
-            edge_matrix[u_nbr][u] = new Edges;
+            edge_matrix[u_nbr][u] = std::make_shared<Edges>();
             edge_matrix[u_nbr][u]->vertex_count_ = candidates_count[u_nbr];
-            edge_matrix[u_nbr][u]->offset_ = new ui[candidates_count[u_nbr] + 1];
+            edge_matrix[u_nbr][u]->offset_.resize(candidates_count[u_nbr] + 1);
 
-            edge_matrix[u][u_nbr] = new Edges;
+            edge_matrix[u][u_nbr] = std::make_shared<Edges>();
             edge_matrix[u][u_nbr]->vertex_count_ = candidates_count[u];
-            edge_matrix[u][u_nbr]->offset_ = new ui[candidates_count[u] + 1];
-            std::fill(edge_matrix[u][u_nbr]->offset_, edge_matrix[u][u_nbr]->offset_ + candidates_count[u] + 1, 0);
+            edge_matrix[u][u_nbr]->offset_.resize(candidates_count[u] + 1);
+            std::fill(edge_matrix[u][u_nbr]->offset_.begin(), edge_matrix[u][u_nbr]->offset_.begin() + candidates_count[u] + 1, 0);
 
             ui local_edge_count = 0;
             ui local_max_degree = 0;
@@ -97,11 +92,12 @@ void BuildTable::buildTables(const Graph *data_graph, const Graph *query_graph, 
             edge_matrix[u_nbr][u]->offset_[candidates_count[u_nbr]] = local_edge_count;
             edge_matrix[u_nbr][u]->max_degree_ = local_max_degree;
             edge_matrix[u_nbr][u]->edge_count_ = local_edge_count;
-            edge_matrix[u_nbr][u]->edge_ = new ui[local_edge_count];
-            std::copy(temp_edges.begin(), temp_edges.begin() + local_edge_count, edge_matrix[u_nbr][u]->edge_);
+            edge_matrix[u_nbr][u]->edge_.assign(temp_edges.begin(), temp_edges.begin() + local_edge_count);
+
+            // std::copy(temp_edges.begin(), temp_edges.begin() + local_edge_count, edge_matrix[u_nbr][u]->edge_);
 
             edge_matrix[u][u_nbr]->edge_count_ = local_edge_count;
-            edge_matrix[u][u_nbr]->edge_ = new ui[local_edge_count];
+            edge_matrix[u][u_nbr]->edge_.resize(local_edge_count);
 
             local_max_degree = 0;
             for (ui j = 1; j <= candidates_count[u]; ++j) {
@@ -152,7 +148,7 @@ void BuildTable::buildTables(const Graph *data_graph, const Graph *query_graph, 
 #endif
 }
 
-void BuildTable::printTableCardinality(const Graph *query_graph, Edges ***edge_matrix) {
+void BuildTable::printTableCardinality(const graph_ptr query_graph, EdgesPtrMatrix &edge_matrix) {
     std::vector<std::pair<std::pair<VertexID, VertexID >, ui>> core_edges;
     std::vector<std::pair<std::pair<VertexID, VertexID >, ui>> tree_edges;
     std::vector<std::pair<std::pair<VertexID, VertexID >, ui>> leaf_edges;
@@ -199,7 +195,7 @@ void BuildTable::printTableCardinality(const Graph *query_graph, Edges ***edge_m
     printf("Total Cardinality: %.1lf\n", sum);
 }
 
-void BuildTable::printTableCardinality(const Graph *query_graph, TreeNode *tree, ui *order,
+void BuildTable::printTableCardinality(const graph_ptr query_graph, TreeNodeArray &tree, UIntArray &order,
                                       std::vector<std::unordered_map<VertexID, std::vector<VertexID >>> &TE_Candidates,
                                       std::vector<std::vector<std::unordered_map<VertexID, std::vector<VertexID>>>> &NTE_Candidates) {
     std::vector<std::pair<std::pair<VertexID, VertexID >, ui>> core_edges;
@@ -270,7 +266,7 @@ void BuildTable::printTableCardinality(const Graph *query_graph, TreeNode *tree,
     printf("Total Cardinality: %.1lf\n", sum);
 }
 
-void BuildTable::printTableInfo(const Graph *query_graph, Edges ***edge_matrix) {
+void BuildTable::printTableInfo(const graph_ptr query_graph, EdgesPtrMatrix &edge_matrix) {
     ui query_vertices_num = query_graph->getVerticesCount();
     printf("Index Info:\n");
 
@@ -288,7 +284,7 @@ void BuildTable::printTableInfo(const Graph *query_graph, Edges ***edge_matrix) 
     }
 }
 
-void BuildTable::printTableInfo(VertexID begin_vertex, VertexID end_vertex, Edges ***edge_matrix) {
+void BuildTable::printTableInfo(VertexID begin_vertex, VertexID end_vertex, EdgesPtrMatrix &edge_matrix) {
     Edges& edge = *edge_matrix[begin_vertex][end_vertex];
     ui vertex_count = edge.vertex_count_;
     ui edge_count = edge.edge_count_;
@@ -299,7 +295,7 @@ void BuildTable::printTableInfo(VertexID begin_vertex, VertexID end_vertex, Edge
            begin_vertex, end_vertex, edge_count, vertex_count, max_degree, average);
 }
 
-size_t BuildTable::computeMemoryCostInBytes(const Graph *query_graph, ui *candidates_count, Edges ***edge_matrix) {
+size_t BuildTable::computeMemoryCostInBytes(const graph_ptr query_graph, UIntArray &candidates_count, EdgesPtrMatrix &edge_matrix) {
     size_t memory_cost_in_bytes = 0;
     size_t per_element_size = sizeof(ui);
 
@@ -327,7 +323,7 @@ size_t BuildTable::computeMemoryCostInBytes(const Graph *query_graph, ui *candid
     return memory_cost_in_bytes;
 }
 
-size_t BuildTable::computeMemoryCostInBytes(const Graph *query_graph, ui *candidates_count, ui *order, TreeNode *tree,
+size_t BuildTable::computeMemoryCostInBytes(const graph_ptr query_graph, UIntArray &candidates_count, UIntArray &order, TreeNodeArray &tree,
                                             std::vector<std::unordered_map<VertexID, std::vector<VertexID >>> &TE_Candidates,
                                             std::vector<std::vector<std::unordered_map<VertexID, std::vector<VertexID>>>> &NTE_Candidates) {
     size_t memory_cost_in_bytes = 0;

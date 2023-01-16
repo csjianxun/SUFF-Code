@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.12)
 if (APPLE)
-    set(CMAKE_C_COMPILER "/usr/local/Cellar/gcc/11.3.0/bin/gcc-11")
-    set(CMAKE_CXX_COMPILER "/usr/local/Cellar/gcc/11.3.0/bin/g++-11")
+    set(CMAKE_C_COMPILER "/usr/local/Cellar/gcc/12.2.0/bin/gcc-12")
+    set(CMAKE_CXX_COMPILER "/usr/local/Cellar/gcc/12.2.0/bin/g++-12")
 elseif (EXISTS "/usr/local/bin/gcc11")  # lccpuXX env
     set(CMAKE_C_COMPILER "/usr/local/bin/gcc11")
     set(CMAKE_CXX_COMPILER "/usr/local/bin/g++11")
@@ -22,16 +22,6 @@ include_directories(
     ${CMAKE_CURRENT_LIST_DIR}/src/
 )
 
-if (APPLE)
-    include_directories(/usr/local/Cellar/gperftools/2.9.1_1/include)
-    # LIST(APPEND CMAKE_MODULE_PATH "/Users/jianxun/CLionProjects/Graph")
-else()
-    include_directories(/usr/include)
-    # LIST(APPEND CMAKE_MODULE_PATH "/data")
-endif()
-
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR};${CMAKE_MODULE_PATH}")
-find_package(Gperftools REQUIRED)
-message("tcmalloc and profiler lib: ${GPERFTOOLS_LIBRARIES}")
 
 add_subdirectory(src)

@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 #include <filesystem>
-#include <thread>
 #include <atomic>
 #include "configuration/types.hpp"
 #include "graph/graph.h"
@@ -12,7 +11,6 @@
 #include "FilterGenerator.hpp"
 #include "VFilterGenerator.hpp"
 #include "FilterSelector.hpp"
-#include "concurrentqueue.h"
 
 namespace fs = std::filesystem;
 
@@ -42,13 +40,12 @@ namespace suff {
         static std::vector<Filter> new_filters;
         static ui add_level;
         static bool CREATE_FILTER;
+        static std::string SELECTOR;
         // for using filters
         static std::map<std::string, std::vector<Filter>> loaded_filters;
         static std::vector<VFilter> vfilters;  // vfilters[i] stores vfilter at level i
         static std::vector<bool> is_check_vid;  // check if level i has filter
         static std::vector<int> vid2level;  // if vertex v has filter, this gives the level, otherwise gives -1
-        static moodycamel::ConcurrentQueue<VertexID*> queue;
-        static std::vector<std::thread> thread_pool;
         static bool stop;
         // for statistics
         static std::vector<std::atomic_llong> total_check;
@@ -61,21 +58,23 @@ namespace suff {
         static graph_ptr query_graph;
 
         static void Init(const fs::path &root_folder, const fs::path &graph_name, bool create_filter = false,
-            double fpr = 0.01) {
+            double fpr = 0.01, std::string selector = "greedy") {
 
             FilterManager::root_folder = root_folder;
             FilterManager::graph_name = graph_name;
             CREATE_FILTER = create_filter;
             FILTER_FPR = fpr;
+            SELECTOR = selector;
             pattern_size = 0;
             data_size = 0;
             max_size = 0;
             query_name = "";
             add_level = 0;
+            new_filters.clear();
+            loaded_filters.clear();
             vfilters.clear();
             is_check_vid.clear();
             vid2level.clear();
-            thread_pool.clear();
             total_check.clear();
             total_fail.clear();
             temp_valid_mapping.clear();
@@ -92,7 +91,7 @@ namespace suff {
             query_graph = q;
             pattern_size = q->getVerticesCount();
             data_size = d->getVerticesCount();
-            max_size = d->getGraphMaxLabelFrequency();
+            max_size = d->getGraphMaxLabelFrequency() / 10000;
             FilterManager::query_name = query_path.substr(query_path.rfind('/') + 1);
             std::cout << "generating new filters..." << std::endl;
             new_filters = FilterGenerator::GenerateNewFilters(query_path, q, matching_order);
@@ -121,15 +120,20 @@ namespace suff {
                 total_check[i] = 0;
                 total_fail[i] = 0;
             }
-            std::cout << "loading filter configurations..." << std::endl;
             if (loaded_filters.size() == 0) {
-                LoadFilters();
+                return;
             }
             std::cout << "generating vfilters..." << std::endl;
             auto initial_vfilters = VFilterGenerator::Generate(q, matching_order, loaded_filters);
             std::cout << "# initial vfilters: " << initial_vfilters.size() << std::endl;
-            std::cout << "selecting " << k << " best filters..." << std::endl;
-            auto selected_vfilters = FilterSelector::SelectK(d, q, matching_order, pivot, initial_vfilters, k);
+            std::vector<VFilter> selected_vfilters;
+            if (SELECTOR == "greedy") {
+                std::cout << "selecting " << k << " best filters..." << std::endl;
+                selected_vfilters = FilterSelector::SelectK(d, q, matching_order, pivot, initial_vfilters, k);
+            } else {
+                std::cout << "selecting " << k << " random filters..." << std::endl;
+                selected_vfilters = FilterSelector::SelectRandomK(d, q, matching_order, pivot, initial_vfilters, k);
+            }
             std::cout << "# selected vfilters: " << selected_vfilters.size() << std::endl;
             // group vfilters by level
             std::cout << "grouping and loading filter data..." << std::endl;
@@ -174,18 +178,21 @@ namespace suff {
             temp_valid_mapping[u][v] = true;
         }
 
-        static void LoadFilters() {
+        static void LoadFilters(bool use_cache=true) {
             long num_loaded = 0;
-            if (ReadFilterCache()) {
+            if (use_cache && ReadFilterCache()) {
                 for (auto &[k, v] : loaded_filters) {
                     num_loaded += v.size();
                 }
                 std::cout << "loaded filters from cache: " << num_loaded << std::endl;
                 return;
             }
+            std::cout << "loading filter configurations..." << std::endl;
             if (fs::is_directory(root_folder / graph_name)) {
                 for (auto &p : fs::directory_iterator(root_folder / graph_name)) {
-                    if (fs::is_directory(p)) {
+                    if (fs::is_directory(p)
+                        && p.path().filename().string().find("_") != std::string::npos  // pre-defined patterns
+                        ) {
                         // std::cout << "folder: " << p.path() << std::endl;
                         auto filters = std::vector<Filter>();
                         for (auto &fp : fs::directory_iterator(p)) {
@@ -256,56 +263,6 @@ namespace suff {
             file.close();
         }
 
-        static void Consume() {
-            VertexID** vertices_list = new VertexID*[100];
-            VertexID* _temp = new VertexID[pattern_size];
-            unsigned long dequeued = -1;
-            std::chrono::milliseconds sleep_time = std::chrono::milliseconds(20);
-            while ((!stop) || dequeued > 0) {
-                dequeued = queue.try_dequeue_bulk(vertices_list, 100);
-                for (auto i = 0ul; i < dequeued; i++) {
-                    for (auto &f: new_filters) {
-                        // f.add(vertices_list[i], _temp);
-                        f.add(vertices_list[i][f.vid]);
-                    }
-                    delete[] vertices_list[i];
-                }
-                if (dequeued == 0) {
-                    std::this_thread::sleep_for(sleep_time);
-                }
-            }
-            delete[] vertices_list;
-            delete[] _temp;
-        }
-
-        static void ConsumeEmpty() {
-            VertexID** vertices_list = new VertexID*[100];
-            unsigned long dequeued = 0;
-            std::chrono::milliseconds sleep_time = std::chrono::milliseconds(20);
-            while ((!stop) || dequeued > 0) {
-                dequeued = queue.try_dequeue_bulk(vertices_list, 100);
-                for (auto i = 0ul; i < dequeued; i++) {
-                    delete[] vertices_list[i];
-                }
-                if (dequeued == 0) {
-                    std::this_thread::sleep_for(sleep_time);
-                }
-            }
-            delete[] vertices_list;
-        }
-
-        static void WaitForStop() {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-            while (FilterManager::queue.size_approx() > 0) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-            };
-            // std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-            stop = true;
-            for (auto i = 0; i < NUM_THREADS; i++) {
-                thread_pool[i].join();
-            }
-        }
-
         static void Dump() {
             if (!CREATE_FILTER) {
                 return;
@@ -342,6 +299,9 @@ namespace suff {
         // pruned filters will not be used (but will be retained on disk)
         // the removed filters will be recorded in a cache file, so you need to remove it for a new run
         static void FilterRemoval(double alpha=0.1, bool force_run=false) {
+            if (loaded_filters.size() == 0) {
+                return;
+            }
             fs::path cache_file_path = root_folder / graph_name / fs::path("removal_cache");
             // if a cache file exists, load the cache file directly
             std::set<std::string> removed;

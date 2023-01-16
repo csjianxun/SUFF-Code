@@ -1,6 +1,3 @@
-//
-// Created by yche on 10/29/19.
-//
 #include <cassert>
 #include <algorithm>
 #include <vector>

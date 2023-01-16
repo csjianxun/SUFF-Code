@@ -10,17 +10,17 @@
 #include <vector>
 class BuildTable {
 public:
-    static void buildTables(const Graph* data_graph, const Graph* query_graph, ui** candidates, ui* candidates_count,
-                            Edges*** edge_matrix);
+    static void buildTables(const graph_ptr data_graph, const graph_ptr query_graph, UIntMatrix &candidates, UIntArray &candidates_count,
+                            EdgesPtrMatrix &edge_matrix);
 
-    static void printTableCardinality(const Graph* query_graph, Edges*** edge_matrix);
-    static void printTableCardinality(const Graph *query_graph, TreeNode *tree, ui *order,
+    static void printTableCardinality(const graph_ptr query_graph, EdgesPtrMatrix &edge_matrix);
+    static void printTableCardinality(const graph_ptr query_graph, TreeNodeArray &tree, UIntArray &order,
                                          std::vector<std::unordered_map<VertexID, std::vector<VertexID >>> &TE_Candidates,
                                          std::vector<std::vector<std::unordered_map<VertexID, std::vector<VertexID>>>> &NTE_Candidates);
-    static void printTableInfo(const Graph* query_graph, Edges*** edge_matrix);
-    static void printTableInfo(VertexID begin_vertex, VertexID end_vertex, Edges*** edge_matrix);
-    static size_t computeMemoryCostInBytes(const Graph* query_graph, ui* candidates_count, Edges*** edge_matrix);
-    static size_t computeMemoryCostInBytes(const Graph *query_graph, ui *candidates_count, ui *order, TreeNode *tree,
+    static void printTableInfo(const graph_ptr query_graph, EdgesPtrMatrix &edge_matrix);
+    static void printTableInfo(VertexID begin_vertex, VertexID end_vertex, EdgesPtrMatrix &edge_matrix);
+    static size_t computeMemoryCostInBytes(const graph_ptr query_graph, UIntArray &candidates_count, EdgesPtrMatrix &edge_matrix);
+    static size_t computeMemoryCostInBytes(const graph_ptr query_graph, UIntArray &candidates_count, UIntArray &order, TreeNodeArray &tree,
                                                std::vector<std::unordered_map<VertexID, std::vector<VertexID >>> &TE_Candidates,
                                                std::vector<std::vector<std::unordered_map<VertexID, std::vector<VertexID>>>> &NTE_Candidates);
 

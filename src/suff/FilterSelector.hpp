@@ -38,6 +38,23 @@ namespace suff {
             return results;
         }
 
+        // select k random VFilters for each vertex in q
+        static std::vector<VFilter> SelectRandomK(const graph_ptr d, const graph_ptr q,
+            const std::vector<VertexID> &matching_order, const std::vector<VertexID> &pivot,
+            std::vector<VFilter> &vfilters, long k) {
+            
+            std::vector<VFilter> results;
+            for (auto i = 0ul; i < q->getVerticesCount(); i++) {
+                auto temp = selectRandomKForV(q, matching_order, vfilters, i, k);
+                for (auto &f: temp) {
+                    results.emplace_back(f);
+                }
+            }
+            
+            std::cout << "resulting vfilters: " << results.size() << std::endl;
+            return results;
+        }
+
     private:
         // estimate #branches at each level
         // not finished
@@ -95,8 +112,7 @@ namespace suff {
             for (auto v1 = 0ul; v1 < pattern->getVerticesCount(); v1++) {
                 for (auto v2 = v1; v2 < pattern->getVerticesCount(); v2++) {
                     if (pattern->checkEdgeExistence(v1, v2)
-                     && seen_vertices.contains(mapping.at(v1))
-                      && seen_vertices.contains(mapping.at(v2))) {
+                     && (seen_vertices.contains(mapping.at(v1)) || seen_vertices.contains(mapping.at(v2)))) {
                         score -= 1;
                     }
                 }
@@ -186,6 +202,18 @@ namespace suff {
                 }
             }
 
+            return result;
+        }
+
+        static std::vector<VFilter> selectRandomKForV(const graph_ptr q, const std::vector<VertexID> &matching_order,
+         std::vector<VFilter> &candidates, VertexID v, long k) {
+            std::vector<VFilter> result;
+            std::vector<VFilter> _candidates;
+            for (auto &f : candidates) {
+                if (f.vid == v && result.size() < k) {
+                    result.emplace_back(f);
+                }
+            }
             return result;
         }
     };

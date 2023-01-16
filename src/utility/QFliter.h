@@ -1,7 +1,3 @@
-//
-// Created by ssunah on 11/1/19.
-//
-
 #ifndef SUBGRAPHMATCHING_QFLITER_H
 #define SUBGRAPHMATCHING_QFLITER_H
 

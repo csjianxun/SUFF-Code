@@ -11,7 +11,7 @@
 #define INVALID_VERTEX_ID 100000000
 
 bool
-FilterVertices::LDFFilter(const Graph *data_graph, const Graph *query_graph, ui **&candidates, ui *&candidates_count) {
+FilterVertices::LDFFilter(const graph_ptr data_graph, const graph_ptr query_graph, UIntMatrix &candidates, UIntArray &candidates_count) {
     allocateBuffer(data_graph, query_graph, candidates, candidates_count);
 
     for (ui i = 0; i < query_graph->getVerticesCount(); ++i) {
@@ -37,7 +37,7 @@ FilterVertices::LDFFilter(const Graph *data_graph, const Graph *query_graph, ui 
 }
 
 bool
-FilterVertices::NLFFilter(const Graph *data_graph, const Graph *query_graph, ui **&candidates, ui *&candidates_count) {
+FilterVertices::NLFFilter(const graph_ptr data_graph, const graph_ptr query_graph, UIntMatrix &candidates, UIntArray &candidates_count) {
     allocateBuffer(data_graph, query_graph, candidates, candidates_count);
 
     for (ui i = 0; i < query_graph->getVerticesCount(); ++i) {
@@ -53,7 +53,7 @@ FilterVertices::NLFFilter(const Graph *data_graph, const Graph *query_graph, ui 
 }
 
 bool
-FilterVertices::GQLFilter(const Graph *data_graph, const Graph *query_graph, ui **&candidates, ui *&candidates_count) {
+FilterVertices::GQLFilter(const graph_ptr data_graph, const graph_ptr query_graph, UIntMatrix &candidates, UIntArray &candidates_count) {
     // Local refinement.
     if (!NLFFilter(data_graph, query_graph, candidates, candidates_count))
         return false;
@@ -62,22 +62,22 @@ FilterVertices::GQLFilter(const Graph *data_graph, const Graph *query_graph, ui 
     ui query_vertex_num = query_graph->getVerticesCount();
     ui data_vertex_num = data_graph->getVerticesCount();
 
-    bool** valid_candidates = new bool*[query_vertex_num];
+    BoolMatrix valid_candidates(query_vertex_num);
     for (ui i = 0; i < query_vertex_num; ++i) {
-        valid_candidates[i] = new bool[data_vertex_num];
-        memset(valid_candidates[i], 0, sizeof(bool) * data_vertex_num);
+        valid_candidates[i].resize(data_vertex_num, false);
+        // memset(valid_candidates[i], 0, sizeof(bool) * data_vertex_num);
     }
 
     ui query_graph_max_degree = query_graph->getGraphMaxDegree();
     ui data_graph_max_degree = data_graph->getGraphMaxDegree();
 
-    int* left_to_right_offset = new int[query_graph_max_degree + 1];
-    int* left_to_right_edges = new int[query_graph_max_degree * data_graph_max_degree];
-    int* left_to_right_match = new int[query_graph_max_degree];
-    int* right_to_left_match = new int[data_graph_max_degree];
-    int* match_visited = new int[data_graph_max_degree + 1];
-    int* match_queue = new int[query_vertex_num];
-    int* match_previous = new int[data_graph_max_degree + 1];
+    IntArray left_to_right_offset(query_graph_max_degree + 1);
+    IntArray left_to_right_edges(query_graph_max_degree * data_graph_max_degree);
+    IntArray left_to_right_match(query_graph_max_degree);
+    IntArray right_to_left_match(data_graph_max_degree);
+    IntArray match_visited(data_graph_max_degree + 1);
+    IntArray match_queue(query_vertex_num);
+    IntArray match_previous(data_graph_max_degree + 1);
 
     // Record valid candidate vertices for each query vertex.
     for (ui i = 0; i < query_vertex_num; ++i) {
@@ -111,25 +111,12 @@ FilterVertices::GQLFilter(const Graph *data_graph, const Graph *query_graph, ui 
     // Compact candidates.
     compactCandidates(candidates, candidates_count, query_vertex_num);
 
-    // Release memory.
-    for (ui i = 0; i < query_vertex_num; ++i) {
-        delete[] valid_candidates[i];
-    }
-    delete[] valid_candidates;
-    delete[] left_to_right_offset;
-    delete[] left_to_right_edges;
-    delete[] left_to_right_match;
-    delete[] right_to_left_match;
-    delete[] match_visited;
-    delete[] match_queue;
-    delete[] match_previous;
-
     return isCandidateSetValid(candidates, candidates_count, query_vertex_num);
 }
 
 bool
-FilterVertices::TSOFilter(const Graph *data_graph, const Graph *query_graph, ui **&candidates, ui *&candidates_count,
-                          ui *&order, TreeNode *&tree) {
+FilterVertices::TSOFilter(const graph_ptr data_graph, const graph_ptr query_graph, UIntMatrix &candidates, UIntArray &candidates_count,
+                          UIntArray &order, TreeNodeArray &tree) {
     allocateBuffer(data_graph, query_graph, candidates, candidates_count);
     GenerateFilteringPlan::generateTSOFilterPlan(data_graph, query_graph, tree, order);
 
@@ -139,14 +126,16 @@ FilterVertices::TSOFilter(const Graph *data_graph, const Graph *query_graph, ui 
     VertexID start_vertex = order[0];
     computeCandidateWithNLF(data_graph, query_graph, start_vertex, candidates_count[start_vertex], candidates[start_vertex]);
 
-    ui* updated_flag = new ui[data_graph->getVerticesCount()];
-    ui* flag = new ui[data_graph->getVerticesCount()];
-    std::fill(flag, flag + data_graph->getVerticesCount(), 0);
+    UIntArray updated_flag(data_graph->getVerticesCount());
+    UIntArray flag(data_graph->getVerticesCount(), 0);
+    // std::fill(flag, flag + data_graph->getVerticesCount(), 0);
 
+    UIntArray temp(1);
     for (ui i = 1; i < query_vertex_num; ++i) {
         VertexID query_vertex = order[i];
         TreeNode& node = tree[query_vertex];
-        generateCandidates(data_graph, query_graph, query_vertex, &node.parent_, 1, candidates, candidates_count, flag, updated_flag);
+        temp[0] = node.parent_;
+        generateCandidates(data_graph, query_graph, query_vertex, temp, 1, candidates, candidates_count, flag, updated_flag);
     }
 
     for (int i = query_vertex_num - 1; i >= 0; --i) {
@@ -159,25 +148,23 @@ FilterVertices::TSOFilter(const Graph *data_graph, const Graph *query_graph, ui 
 
     compactCandidates(candidates, candidates_count, query_vertex_num);
 
-    delete[] updated_flag;
-    delete[] flag;
     return isCandidateSetValid(candidates, candidates_count, query_vertex_num);
 }
 
 bool
-FilterVertices::CFLFilter(const Graph *data_graph, const Graph *query_graph, ui **&candidates, ui *&candidates_count,
-                          ui *&order, TreeNode *&tree) {
+FilterVertices::CFLFilter(const graph_ptr data_graph, const graph_ptr query_graph, UIntMatrix &candidates, UIntArray &candidates_count,
+                          UIntArray &order, TreeNodeArray &tree) {
     allocateBuffer(data_graph, query_graph, candidates, candidates_count);
     int level_count;
-    ui* level_offset;
+    UIntArray level_offset;
     GenerateFilteringPlan::generateCFLFilterPlan(data_graph, query_graph, tree, order, level_count, level_offset);
 
     VertexID start_vertex = order[0];
     computeCandidateWithNLF(data_graph, query_graph, start_vertex, candidates_count[start_vertex], candidates[start_vertex]);
 
-    ui* updated_flag = new ui[data_graph->getVerticesCount()];
-    ui* flag = new ui[data_graph->getVerticesCount()];
-    std::fill(flag, flag + data_graph->getVerticesCount(), 0);
+    UIntArray updated_flag(data_graph->getVerticesCount());
+    UIntArray flag(data_graph->getVerticesCount());
+    std::fill(flag.begin(), flag.begin() + data_graph->getVerticesCount(), 0);
 
     // Top-down generation.
     for (int i = 1; i < level_count; ++i) {
@@ -214,23 +201,21 @@ FilterVertices::CFLFilter(const Graph *data_graph, const Graph *query_graph, ui 
 
     compactCandidates(candidates, candidates_count, query_graph->getVerticesCount());
 
-    delete[] updated_flag;
-    delete[] flag;
     return isCandidateSetValid(candidates, candidates_count, query_graph->getVerticesCount());
 }
 
 bool
-FilterVertices::DPisoFilter(const Graph *data_graph, const Graph *query_graph, ui **&candidates, ui *&candidates_count,
-                            ui *&order, TreeNode *&tree) {
+FilterVertices::DPisoFilter(const graph_ptr data_graph, const graph_ptr query_graph, UIntMatrix &candidates, UIntArray &candidates_count,
+                          UIntArray &order, TreeNodeArray &tree) {
     if (!LDFFilter(data_graph, query_graph, candidates, candidates_count))
         return false;
 
     GenerateFilteringPlan::generateDPisoFilterPlan(data_graph, query_graph, tree, order);
 
     ui query_vertices_num = query_graph->getVerticesCount();
-    ui* updated_flag = new ui[data_graph->getVerticesCount()];
-    ui* flag = new ui[data_graph->getVerticesCount()];
-    std::fill(flag, flag + data_graph->getVerticesCount(), 0);
+    UIntArray updated_flag(data_graph->getVerticesCount());
+    UIntArray flag(data_graph->getVerticesCount());
+    std::fill(flag.begin(), flag.begin() + data_graph->getVerticesCount(), 0);
 
     // The number of refinement is k. According to the original paper, we set k as 3.
     for (ui k = 0; k < 3; ++k) {
@@ -252,14 +237,12 @@ FilterVertices::DPisoFilter(const Graph *data_graph, const Graph *query_graph, u
 
     compactCandidates(candidates, candidates_count, query_graph->getVerticesCount());
 
-    delete[] updated_flag;
-    delete[] flag;
     return isCandidateSetValid(candidates, candidates_count, query_graph->getVerticesCount());
 }
 
 bool
-FilterVertices::CECIFilter(const Graph *data_graph, const Graph *query_graph, ui **&candidates, ui *&candidates_count,
-                           ui *&order, TreeNode *&tree,  std::vector<std::unordered_map<VertexID, std::vector<VertexID >>> &TE_Candidates,
+FilterVertices::CECIFilter(const graph_ptr data_graph, const graph_ptr query_graph, UIntMatrix &candidates, UIntArray &candidates_count,
+                          UIntArray &order, TreeNodeArray &tree,  std::vector<std::unordered_map<VertexID, std::vector<VertexID >>> &TE_Candidates,
                            std::vector<std::vector<std::unordered_map<VertexID, std::vector<VertexID>>>> &NTE_Candidates) {
     GenerateFilteringPlan::generateCECIFilterPlan(data_graph, query_graph, tree, order);
 
@@ -298,7 +281,7 @@ FilterVertices::CECIFilter(const Graph *data_graph, const Graph *query_graph, ui
         candidates_count[u] = 0;
 
         visited_query_vertex[u] = true;
-        VertexID* frontiers = candidates[u_p];
+        UIntArray &frontiers = candidates[u_p];
         ui frontiers_count = candidates_count[u_p];
 
         for (ui j = 0; j < frontiers_count; ++j) {
@@ -387,7 +370,7 @@ FilterVertices::CECIFilter(const Graph *data_graph, const Graph *query_graph, ui
 #endif
         for (ui l = 0; l < u_node.bn_count_; ++l) {
             VertexID u_p = u_node.bn_[l];
-            VertexID *frontiers = candidates[u_p];
+            UIntArray &frontiers = candidates[u_p];
             ui frontiers_count = candidates_count[u_p];
 
             for (ui j = 0; j < frontiers_count; ++j) {
@@ -496,7 +479,7 @@ FilterVertices::CECIFilter(const Graph *data_graph, const Graph *query_graph, ui
         }
 
         VertexID u_p = u_node.parent_;
-        VertexID* frontiers = candidates[u_p];
+        UIntArray &frontiers = candidates[u_p];
         ui frontiers_count = candidates_count[u_p];
 
         // Loop over TE_Candidates.
@@ -559,7 +542,7 @@ FilterVertices::CECIFilter(const Graph *data_graph, const Graph *query_graph, ui
             auto iter = TE_Candidates[u].begin();
             while (iter != TE_Candidates[u].end()) {
                 VertexID v_f = iter->first;
-                if (!std::binary_search(candidates[u_p], candidates[u_p] + candidates_count[u_p], v_f)) {
+                if (!std::binary_search(candidates[u_p].begin(), candidates[u_p].begin() + candidates_count[u_p], v_f)) {
                     iter = TE_Candidates[u].erase(iter);
                 }
                 else {
@@ -576,7 +559,7 @@ FilterVertices::CECIFilter(const Graph *data_graph, const Graph *query_graph, ui
                 auto iter = NTE_Candidates[u][u_p].end();
                 while (iter != NTE_Candidates[u][u_p].end()) {
                     VertexID v_f = iter->first;
-                    if (!std::binary_search(candidates[u_p], candidates[u_p] + candidates_count[u_p], v_f)) {
+                    if (!std::binary_search(candidates[u_p].begin(), candidates[u_p].begin() + candidates_count[u_p], v_f)) {
                         iter = NTE_Candidates[u][u_p].erase(iter);
                     }
                     else {
@@ -632,26 +615,26 @@ FilterVertices::CECIFilter(const Graph *data_graph, const Graph *query_graph, ui
     return true;
 }
 
-void FilterVertices::allocateBuffer(const Graph *data_graph, const Graph *query_graph, ui **&candidates,
-                                    ui *&candidates_count) {
+void FilterVertices::allocateBuffer(const graph_ptr data_graph, const graph_ptr query_graph, UIntMatrix &candidates,
+                                    UIntArray &candidates_count) {
     ui query_vertex_num = query_graph->getVerticesCount();
     ui candidates_max_num = data_graph->getGraphMaxLabelFrequency();
 
-    candidates_count = new ui[query_vertex_num];
-    memset(candidates_count, 0, sizeof(ui) * query_vertex_num);
+    candidates_count.resize(query_vertex_num, 0);
+    // memset(candidates_count, 0, sizeof(ui) * query_vertex_num);
 
-    candidates = new ui*[query_vertex_num];
+    candidates.resize(query_vertex_num);
 
     for (ui i = 0; i < query_vertex_num; ++i) {
-        candidates[i] = new ui[candidates_max_num];
+        candidates[i].resize(candidates_max_num, 0);
     }
 }
 
 bool
-FilterVertices::verifyExactTwigIso(const Graph *data_graph, const Graph *query_graph, ui data_vertex, ui query_vertex,
-                                   bool **valid_candidates, int *left_to_right_offset, int *left_to_right_edges,
-                                   int *left_to_right_match, int *right_to_left_match, int* match_visited,
-                                   int* match_queue, int* match_previous) {
+FilterVertices::verifyExactTwigIso(const graph_ptr data_graph, const graph_ptr query_graph, ui data_vertex, ui query_vertex,
+                                   BoolMatrix &valid_candidates, IntArray &left_to_right_offset, IntArray &left_to_right_edges,
+                                   IntArray &left_to_right_match, IntArray &right_to_left_match, IntArray &match_visited,
+                                   IntArray &match_queue, IntArray &match_previous) {
     // Construct the bipartite graph between N(query_vertex) and N(data_vertex)
     ui left_partition_size;
     ui right_partition_size;
@@ -673,8 +656,10 @@ FilterVertices::verifyExactTwigIso(const Graph *data_graph, const Graph *query_g
     }
     left_to_right_offset[left_partition_size] = edge_count;
 
-    memset(left_to_right_match, -1, left_partition_size * sizeof(int));
-    memset(right_to_left_match, -1, right_partition_size * sizeof(int));
+    std::fill(left_to_right_match.begin(), left_to_right_match.begin() + left_partition_size, -1);
+    std::fill(right_to_left_match.begin(), right_to_left_match.begin() + right_partition_size, -1);
+    // memset(left_to_right_match, -1, left_partition_size * sizeof(int));
+    // memset(right_to_left_match, -1, right_partition_size * sizeof(int));
 
     GraphOperations::match_bfs(left_to_right_offset, left_to_right_edges, left_to_right_match, right_to_left_match,
                                match_visited, match_queue, match_previous, left_partition_size, right_partition_size);
@@ -686,7 +671,7 @@ FilterVertices::verifyExactTwigIso(const Graph *data_graph, const Graph *query_g
     return true;
 }
 
-void FilterVertices::compactCandidates(ui **&candidates, ui *&candidates_count, ui query_vertex_num) {
+void FilterVertices::compactCandidates(UIntMatrix &candidates, UIntArray &candidates_count, ui query_vertex_num) {
     for (ui i = 0; i < query_vertex_num; ++i) {
         VertexID query_vertex = i;
         ui next_position = 0;
@@ -702,7 +687,7 @@ void FilterVertices::compactCandidates(ui **&candidates, ui *&candidates_count, 
     }
 }
 
-bool FilterVertices::isCandidateSetValid(ui **&candidates, ui *&candidates_count, ui query_vertex_num) {
+bool FilterVertices::isCandidateSetValid(UIntMatrix &candidates, UIntArray &candidates_count, ui query_vertex_num) {
     for (ui i = 0; i < query_vertex_num; ++i) {
         if (candidates_count[i] == 0)
             return false;
@@ -711,8 +696,8 @@ bool FilterVertices::isCandidateSetValid(ui **&candidates, ui *&candidates_count
 }
 
 void
-FilterVertices::computeCandidateWithNLF(const Graph *data_graph, const Graph *query_graph, VertexID query_vertex,
-                                               ui &count, ui *buffer) {
+FilterVertices::computeCandidateWithNLF(const graph_ptr data_graph, const graph_ptr query_graph, VertexID query_vertex,
+                                               ui &count, UIntArray &buffer) {
     LabelID label = query_graph->getVertexLabel(query_vertex);
     ui degree = query_graph->getVertexDegree(query_vertex);
 #if OPTIMIZED_LABELED_GRAPH == 1
@@ -741,14 +726,14 @@ FilterVertices::computeCandidateWithNLF(const Graph *data_graph, const Graph *qu
                 }
 
                 if (is_valid) {
-                    if (buffer != NULL) {
+                    if (!buffer.empty()) {
                         buffer[count] = data_vertex;
                     }
                     count += 1;
                 }
             }
 #else
-            if (buffer != NULL) {
+            if (!buffer.empty()) {
                 buffer[count] = data_vertex;
             }
             count += 1;
@@ -758,15 +743,15 @@ FilterVertices::computeCandidateWithNLF(const Graph *data_graph, const Graph *qu
 
 }
 
-void FilterVertices::computeCandidateWithLDF(const Graph *data_graph, const Graph *query_graph, VertexID query_vertex,
-                                             ui &count, ui *buffer) {
+void FilterVertices::computeCandidateWithLDF(const graph_ptr data_graph, const graph_ptr query_graph, VertexID query_vertex,
+                                             ui &count, UIntArray &buffer) {
     LabelID label = query_graph->getVertexLabel(query_vertex);
     ui degree = query_graph->getVertexDegree(query_vertex);
     count = 0;
     ui data_vertex_num;
     const ui* data_vertices = data_graph->getVerticesByLabel(label, data_vertex_num);
 
-    if (buffer == NULL) {
+    if (buffer.empty()) {
         for (ui i = 0; i < data_vertex_num; ++i) {
             VertexID v = data_vertices[i];
             if (data_graph->getVertexDegree(v) >= degree) {
@@ -784,9 +769,9 @@ void FilterVertices::computeCandidateWithLDF(const Graph *data_graph, const Grap
     }
 }
 
-void FilterVertices::generateCandidates(const Graph *data_graph, const Graph *query_graph, VertexID query_vertex,
-                                       VertexID *pivot_vertices, ui pivot_vertices_count, VertexID **candidates,
-                                       ui *candidates_count, ui *flag, ui *updated_flag) {
+void FilterVertices::generateCandidates(const graph_ptr data_graph, const graph_ptr query_graph, VertexID query_vertex,
+                                       UIntArray &pivot_vertices, ui pivot_vertices_count, UIntMatrix &candidates,
+                                       UIntArray &candidates_count, UIntArray &flag, UIntArray &updated_flag) {
     LabelID query_vertex_label = query_graph->getVertexLabel(query_vertex);
     ui query_vertex_degree = query_graph->getVertexDegree(query_vertex);
 #if OPTIMIZED_LABELED_GRAPH == 1
@@ -857,9 +842,9 @@ void FilterVertices::generateCandidates(const Graph *data_graph, const Graph *qu
     }
 }
 
-void FilterVertices::pruneCandidates(const Graph *data_graph, const Graph *query_graph, VertexID query_vertex,
-                                    VertexID *pivot_vertices, ui pivot_vertices_count, VertexID **candidates,
-                                    ui *candidates_count, ui *flag, ui *updated_flag) {
+void FilterVertices::pruneCandidates(const graph_ptr data_graph, const graph_ptr query_graph, VertexID query_vertex,
+                                    UIntArray &pivot_vertices, ui pivot_vertices_count, UIntMatrix &candidates,
+                                    UIntArray &candidates_count, UIntArray &flag, UIntArray &updated_flag) {
     LabelID query_vertex_label = query_graph->getVertexLabel(query_vertex);
     ui query_vertex_degree = query_graph->getVertexDegree(query_vertex);
 
@@ -910,7 +895,7 @@ void FilterVertices::pruneCandidates(const Graph *data_graph, const Graph *query
     }
 }
 
-void FilterVertices::printCandidatesInfo(const Graph *query_graph, ui *candidates_count, std::vector<ui> &optimal_candidates_count) {
+void FilterVertices::printCandidatesInfo(const graph_ptr query_graph, UIntArray &candidates_count, std::vector<ui> &optimal_candidates_count) {
     std::vector<std::pair<VertexID, ui>> core_vertices;
     std::vector<std::pair<VertexID, ui>> tree_vertices;
     std::vector<std::pair<VertexID, ui>> leaf_vertices;
@@ -954,22 +939,22 @@ void FilterVertices::printCandidatesInfo(const Graph *query_graph, ui *candidate
     printf("Total #Candidates: %.1lf, %.1lf\n", sum, optimal_sum);
 }
 
-void FilterVertices::sortCandidates(ui **candidates, ui *candidates_count, ui num) {
+void FilterVertices::sortCandidates(UIntMatrix &candidates, UIntArray &candidates_count, ui num) {
     for (ui i = 0; i < num; ++i) {
-        std::sort(candidates[i], candidates[i] + candidates_count[i]);
+        std::sort(candidates[i].begin(), candidates[i].begin() + candidates_count[i]);
     }
 }
 
 double
-FilterVertices::computeCandidatesFalsePositiveRatio(const Graph *data_graph, const Graph *query_graph, ui **candidates,
-                                                    ui *candidates_count, std::vector<ui> &optimal_candidates_count) {
+FilterVertices::computeCandidatesFalsePositiveRatio(const graph_ptr data_graph, const graph_ptr query_graph, UIntMatrix &candidates,
+                                                    UIntArray &candidates_count, std::vector<ui> &optimal_candidates_count) {
     ui query_vertices_count = query_graph->getVerticesCount();
     ui data_vertices_count = data_graph->getVerticesCount();
 
     std::vector<std::vector<ui>> candidates_copy(query_vertices_count);
     for (ui i = 0; i < query_vertices_count; ++i) {
         candidates_copy[i].resize(candidates_count[i]);
-        std::copy(candidates[i], candidates[i] + candidates_count[i], candidates_copy[i].begin());
+        std::copy(candidates[i].begin(), candidates[i].begin() + candidates_count[i], candidates_copy[i].begin());
     }
 
     std::vector<int> flag(data_vertices_count, 0);

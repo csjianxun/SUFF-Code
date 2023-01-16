@@ -7,16 +7,16 @@
 
 #include "graphoperations.h"
 
-void GraphOperations::getKCore(const Graph *graph, int *core_table) {
+void GraphOperations::getKCore(const graph_ptr graph, IntArray &core_table) {
     int vertices_count = graph->getVerticesCount();
     int max_degree = graph->getGraphMaxDegree();
 
-    int* vertices = new int[vertices_count];          // Vertices sorted by degree.
-    int* position = new int[vertices_count];          // The position of vertices in vertices array.
-    int* degree_bin = new int[max_degree + 1];      // Degree from 0 to max_degree.
-    int* offset = new int[max_degree + 1];          // The offset in vertices array according to degree.
+    IntArray vertices(vertices_count);          // Vertices sorted by degree.
+    IntArray position(vertices_count);          // The position of vertices in vertices array.
+    IntArray degree_bin(max_degree + 1, 0);      // Degree from 0 to max_degree.
+    IntArray offset(max_degree + 1);          // The offset in vertices array according to degree.
 
-    std::fill(degree_bin, degree_bin + (max_degree + 1), 0);
+    // std::fill(degree_bin, degree_bin + (max_degree + 1), 0);
 
     for (int i = 0; i < vertices_count; ++i) {
         int degree = graph->getVertexDegree(i);
@@ -48,8 +48,8 @@ void GraphOperations::getKCore(const Graph *graph, int *core_table) {
         ui count;
         const VertexID * neighbors = graph->getVertexNeighbors(v, count);
 
-        for(int j = 0; j < count; ++j) {
-            int u = neighbors[j];
+        for(ui j = 0; j < count; ++j) {
+            ui u = neighbors[j];
 
             if (core_table[u] > core_table[v]) {
 
@@ -73,14 +73,9 @@ void GraphOperations::getKCore(const Graph *graph, int *core_table) {
             }
         }
     }
-
-    delete[] vertices;
-    delete[] position;
-    delete[] degree_bin;
-    delete[] offset;
 }
 
-void GraphOperations::old_cheap(int* col_ptrs, int* col_ids, int* match, int* row_match, int n, int m) {
+void GraphOperations::old_cheap(IntArray &col_ptrs, IntArray &col_ids, IntArray &match, IntArray &row_match, int n, int m) {
     int ptr;
     int i = 0;
     for(; i < n; i++) {
@@ -97,14 +92,16 @@ void GraphOperations::old_cheap(int* col_ptrs, int* col_ids, int* match, int* ro
     }
 }
 
-void GraphOperations::match_bfs(int* col_ptrs, int* col_ids, int* match, int* row_match, int* visited,
-                        int* queue, int* previous, int n, int m) {
+void GraphOperations::match_bfs(IntArray &col_ptrs, IntArray &col_ids, IntArray &match, IntArray &row_match, IntArray &visited,
+                        IntArray &queue, IntArray &previous, int n, int m) {
     int queue_ptr, queue_col, ptr, next_augment_no, i, j, queue_size,
             row, col, temp, eptr;
 
     old_cheap(col_ptrs, col_ids, match, row_match, n, m);
 
-    memset(visited, 0, sizeof(int) * m);
+    // visited.resize(m, 0);
+    fill(visited.begin(), visited.begin() + m, 0);
+    // memset(visited, 0, sizeof(int) * m);
 
     next_augment_no = 1;
     for(i = 0; i < n; i++) {
@@ -153,17 +150,17 @@ void GraphOperations::match_bfs(int* col_ptrs, int* col_ids, int* match, int* ro
     }
 }
 
-void GraphOperations::bfsTraversal(const Graph *graph, VertexID root_vertex, TreeNode *&tree, VertexID *&bfs_order) {
+void GraphOperations::bfsTraversal(const graph_ptr graph, VertexID root_vertex, TreeNodeArray & tree, UIntArray & bfs_order) {
     ui vertex_num = graph->getVerticesCount();
 
     std::queue<VertexID> bfs_queue;
     std::vector<bool> visited(vertex_num, false);
 
-    tree = new TreeNode[vertex_num];
+    tree.resize(vertex_num);
     for (ui i = 0; i < vertex_num; ++i) {
         tree[i].initialize(vertex_num);
     }
-    bfs_order = new VertexID[vertex_num];
+    bfs_order.resize(vertex_num);
 
     ui visited_vertex_count = 0;
     bfs_queue.push(root_vertex);
@@ -193,13 +190,13 @@ void GraphOperations::bfsTraversal(const Graph *graph, VertexID root_vertex, Tre
     }
 }
 
-void GraphOperations::dfsTraversal(TreeNode *tree, VertexID root_vertex, ui node_num, VertexID *&dfs_order) {
-    dfs_order = new VertexID[node_num];
+void GraphOperations::dfsTraversal(TreeNodeArray &tree, VertexID root_vertex, ui node_num, UIntArray &dfs_order) {
+    dfs_order.resize(node_num);
     ui count = 0;
     dfs(tree, root_vertex, dfs_order, count);
 }
 
-void GraphOperations::dfs(TreeNode *tree, VertexID cur_vertex, VertexID *dfs_order, ui &count) {
+void GraphOperations::dfs(TreeNodeArray &tree, VertexID cur_vertex, UIntArray &dfs_order, ui &count) {
     dfs_order[count++] = cur_vertex;
 
     for (ui i = 0; i < tree[cur_vertex].children_count_; ++i) {

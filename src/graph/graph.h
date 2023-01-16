@@ -1,7 +1,3 @@
-//
-// Created by ssunah on 6/22/18.
-//
-
 #ifndef SUBGRAPHMATCHING_GRAPH_H
 #define SUBGRAPHMATCHING_GRAPH_H
 
@@ -24,22 +20,23 @@ private:
     ui edges_count_;
     ui labels_count_;
     ui max_degree_;
+    ui min_degree_;
     ui max_label_frequency_;
 
-    ui* offsets_;
-    VertexID * neighbors_;
-    LabelID* labels_;
-    ui* reverse_index_offsets_;
-    ui* reverse_index_;
+    UIntArray offsets_;
+    UIntArray neighbors_;
+    UIntArray labels_;
+    UIntArray reverse_index_offsets_;
+    UIntArray reverse_index_;
 
-    int* core_table_;
+    IntArray core_table_;
     ui core_length_;
 
     std::unordered_map<LabelID, ui> labels_frequency_;
 
 #if OPTIMIZED_LABELED_GRAPH == 1
-    ui* labels_offsets_;
-    std::unordered_map<LabelID, ui>* nlf_;
+    UIntArray labels_offsets_;
+    std::vector<std::unordered_map<LabelID, ui>> nlf_;
 #endif
 
 private:
@@ -58,34 +55,12 @@ public:
         edges_count_ = 0;
         labels_count_ = 0;
         max_degree_ = 0;
+        min_degree_ = -1;
         max_label_frequency_ = 0;
         core_length_ = 0;
-
-        offsets_ = NULL;
-        neighbors_ = NULL;
-        labels_ = NULL;
-        reverse_index_offsets_ = NULL;
-        reverse_index_ = NULL;
-        core_table_ = NULL;
-        labels_frequency_.clear();
-
-#if OPTIMIZED_LABELED_GRAPH == 1
-        labels_offsets_ = NULL;
-        nlf_ = NULL;
-#endif
     }
 
     ~Graph() {
-        delete[] offsets_;
-        delete[] neighbors_;
-        delete[] labels_;
-        delete[] reverse_index_offsets_;
-        delete[] reverse_index_;
-        delete[] core_table_;
-#if OPTIMIZED_LABELED_GRAPH == 1
-        delete[] labels_offsets_;
-        delete[] nlf_;
-#endif
     }
 
 public:
@@ -114,6 +89,10 @@ public:
         return max_degree_;
     }
 
+    const ui getGraphMinDegree() const {
+        return min_degree_;
+    }
+
     const ui getGraphMaxLabelFrequency() const {
         return max_label_frequency_;
     }
@@ -139,24 +118,24 @@ public:
 
     const ui * getVertexNeighbors(const VertexID id, ui& count) const {
         count = offsets_[id + 1] - offsets_[id];
-        return neighbors_ + offsets_[id];
+        return &neighbors_[offsets_[id]];
     }
 
 
     const ui * getVerticesByLabel(const LabelID id, ui& count) const {
         count = reverse_index_offsets_[id + 1] - reverse_index_offsets_[id];
-        return reverse_index_ + reverse_index_offsets_[id];
+        return &reverse_index_[reverse_index_offsets_[id]];
     }
 
 #if OPTIMIZED_LABELED_GRAPH == 1
     const ui * getNeighborsByLabel(const VertexID id, const LabelID label, ui& count) const {
         ui offset = id * labels_count_ + label;
         count = labels_offsets_[offset + 1] - labels_offsets_[offset];
-        return neighbors_ + labels_offsets_[offset];
+        return &neighbors_[labels_offsets_[offset]];
     }
 
     const std::unordered_map<LabelID, ui>* getVertexNLF(const VertexID id) const {
-        return nlf_ + id;
+        return &nlf_[id];
     }
 
     bool checkEdgeExistence(const VertexID u, const VertexID v, const LabelID u_label) const {
@@ -202,7 +181,7 @@ public:
         return false;
     }
 
-    int *getKCore();
+    IntArray getKCore();
     void buildCoreTable();
 };
 

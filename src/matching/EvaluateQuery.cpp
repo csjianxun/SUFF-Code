@@ -1,7 +1,3 @@
-//
-// Created by ssunah on 11/20/18.
-//
-
 #include "EvaluateQuery.h"
 #include "utility/computesetintersection.h"
 #include <vector>
@@ -40,13 +36,13 @@ bool EvaluateQuery::exit_;
 size_t* EvaluateQuery::distribution_count_;
 #endif
 
-void EvaluateQuery::generateBN(const Graph *query_graph, ui *order, ui *pivot, ui **&bn, ui *&bn_count) {
+void EvaluateQuery::generateBN(const graph_ptr query_graph, UIntArray &order, UIntArray &pivot, UIntMatrix &bn, UIntArray &bn_count) {
     ui query_vertices_num = query_graph->getVerticesCount();
-    bn_count = new ui[query_vertices_num];
-    std::fill(bn_count, bn_count + query_vertices_num, 0);
-    bn = new ui *[query_vertices_num];
+    bn_count.resize(query_vertices_num);
+    std::fill(bn_count.begin(), bn_count.begin() + query_vertices_num, 0);
+    bn.resize(query_vertices_num);
     for (ui i = 0; i < query_vertices_num; ++i) {
-        bn[i] = new ui[query_vertices_num];
+        bn[i].resize(query_vertices_num);
     }
 
     std::vector<bool> visited_vertices(query_vertices_num, false);
@@ -68,13 +64,13 @@ void EvaluateQuery::generateBN(const Graph *query_graph, ui *order, ui *pivot, u
     }
 }
 
-void EvaluateQuery::generateBN(const Graph *query_graph, ui *order, ui **&bn, ui *&bn_count) {
+void EvaluateQuery::generateBN(const graph_ptr query_graph, UIntArray &order, UIntMatrix &bn, UIntArray &bn_count) {
     ui query_vertices_num = query_graph->getVerticesCount();
-    bn_count = new ui[query_vertices_num];
-    std::fill(bn_count, bn_count + query_vertices_num, 0);
-    bn = new ui *[query_vertices_num];
+    bn_count.resize(query_vertices_num);
+    std::fill(bn_count.begin(), bn_count.begin() + query_vertices_num, 0);
+    bn.resize(query_vertices_num);
     for (ui i = 0; i < query_vertices_num; ++i) {
-        bn[i] = new ui[query_vertices_num];
+        bn[i].resize(query_vertices_num);
     }
 
     std::vector<bool> visited_vertices(query_vertices_num, false);
@@ -97,21 +93,21 @@ void EvaluateQuery::generateBN(const Graph *query_graph, ui *order, ui **&bn, ui
 }
 
 size_t
-EvaluateQuery::exploreGraph(const Graph *data_graph, const Graph *query_graph, Edges ***edge_matrix, ui **candidates,
-                            ui *candidates_count, ui *order, ui *pivot, size_t output_limit_num, size_t &call_count) {
+EvaluateQuery::exploreGraph(const graph_ptr data_graph, const graph_ptr query_graph, EdgesPtrMatrix &edge_matrix, UIntMatrix &candidates,
+                            UIntArray &candidates_count, UIntArray &order, UIntArray &pivot, size_t output_limit_num, size_t &call_count) {
     // Generate the bn.
-    ui **bn;
-    ui *bn_count;
+    UIntMatrix bn;
+    UIntArray bn_count;
     generateBN(query_graph, order, pivot, bn, bn_count);
 
     // Allocate the memory buffer.
-    ui *idx;
-    ui *idx_count;
-    ui *embedding;
-    ui *idx_embedding;
-    ui *temp_buffer;
-    ui **valid_candidate_idx;
-    bool *visited_vertices;
+    UIntArray idx;
+    UIntArray idx_count;
+    UIntArray embedding;
+    UIntArray idx_embedding;
+    UIntArray temp_buffer;
+    UIntMatrix valid_candidate_idx;
+    BoolArray visited_vertices;
     allocateBuffer(data_graph, query_graph, candidates_count, idx, idx_count, embedding, idx_embedding,
                    temp_buffer, valid_candidate_idx, visited_vertices);
     std::vector<bool> found_embedding(query_graph->getVerticesCount(), false);
@@ -201,9 +197,9 @@ EvaluateQuery::exploreGraph(const Graph *data_graph, const Graph *query_graph, E
 }
 
 void
-EvaluateQuery::allocateBuffer(const Graph *data_graph, const Graph *query_graph, ui *candidates_count, ui *&idx,
-                              ui *&idx_count, ui *&embedding, ui *&idx_embedding, ui *&temp_buffer,
-                              ui **&valid_candidate_idx, bool *&visited_vertices) {
+EvaluateQuery::allocateBuffer(const graph_ptr data_graph, const graph_ptr query_graph, UIntArray &candidates_count, UIntArray &idx,
+                              UIntArray &idx_count, UIntArray &embedding, UIntArray &idx_embedding, UIntArray &temp_buffer,
+                              UIntMatrix &valid_candidate_idx, BoolArray &visited_vertices) {
     ui query_vertices_num = query_graph->getVerticesCount();
     ui data_vertices_num = data_graph->getVerticesCount();
     ui max_candidates_num = candidates_count[0];
@@ -217,30 +213,30 @@ EvaluateQuery::allocateBuffer(const Graph *data_graph, const Graph *query_graph,
         }
     }
 
-    idx = new ui[query_vertices_num];
-    idx_count = new ui[query_vertices_num];
-    embedding = new ui[query_vertices_num];
-    idx_embedding = new ui[query_vertices_num];
-    visited_vertices = new bool[data_vertices_num];
-    temp_buffer = new ui[max_candidates_num];
-    valid_candidate_idx = new ui *[query_vertices_num];
+    idx.resize(query_vertices_num);
+    idx_count.resize(query_vertices_num);
+    embedding.resize(query_vertices_num);
+    idx_embedding.resize(query_vertices_num);
+    visited_vertices.resize(data_vertices_num);
+    temp_buffer.resize(max_candidates_num);
+    valid_candidate_idx.resize(query_vertices_num);
     for (ui i = 0; i < query_vertices_num; ++i) {
-        valid_candidate_idx[i] = new ui[max_candidates_num];
+        valid_candidate_idx[i].resize(max_candidates_num);
     }
 
-    std::fill(visited_vertices, visited_vertices + data_vertices_num, false);
+    std::fill(visited_vertices.begin(), visited_vertices.begin() + data_vertices_num, false);
 }
 
-void EvaluateQuery::generateValidCandidateIndex(const Graph *data_graph, ui depth, ui *embedding, ui *idx_embedding,
-                                                ui *idx_count, ui **valid_candidate_index, Edges ***edge_matrix,
-                                                bool *visited_vertices, ui **bn, ui *bn_cnt, ui *order, ui *pivot,
-                                                ui **candidates) {
+void EvaluateQuery::generateValidCandidateIndex(const graph_ptr data_graph, ui depth, UIntArray &embedding, UIntArray &idx_embedding,
+                                                UIntArray &idx_count, UIntMatrix &valid_candidate_index, EdgesPtrMatrix &edge_matrix,
+                                                BoolArray &visited_vertices, UIntMatrix &bn, UIntArray &bn_cnt, UIntArray &order, UIntArray &pivot,
+                                                UIntMatrix &candidates) {
     VertexID u = order[depth];
     VertexID pivot_vertex = pivot[depth];
     ui idx_id = idx_embedding[pivot_vertex];
     Edges &edge = *edge_matrix[pivot_vertex][u];
     ui count = edge.offset_[idx_id + 1] - edge.offset_[idx_id];
-    ui *candidate_idx = edge.edge_ + edge.offset_[idx_id];
+    ui *candidate_idx = &edge.edge_[0] + edge.offset_[idx_id];
 
     ui valid_candidate_index_count = 0;
 
@@ -279,29 +275,16 @@ void EvaluateQuery::generateValidCandidateIndex(const Graph *data_graph, ui dept
     idx_count[depth] = valid_candidate_index_count;
 }
 
-void EvaluateQuery::releaseBuffer(ui query_vertices_num, ui *idx, ui *idx_count, ui *embedding, ui *idx_embedding,
-                                  ui *temp_buffer, ui **valid_candidate_idx, bool *visited_vertices, ui **bn,
-                                  ui *bn_count) {
-    delete[] idx;
-    delete[] idx_count;
-    delete[] embedding;
-    delete[] idx_embedding;
-    delete[] visited_vertices;
-    delete[] bn_count;
-    delete[] temp_buffer;
-    for (ui i = 0; i < query_vertices_num; ++i) {
-        delete[] valid_candidate_idx[i];
-        delete[] bn[i];
-    }
+void EvaluateQuery::releaseBuffer(ui query_vertices_num, UIntArray &idx, UIntArray &idx_count, UIntArray &embedding, UIntArray &idx_embedding,
+                                  UIntArray &temp_buffer, UIntMatrix &valid_candidate_idx, BoolArray &visited_vertices, UIntMatrix &bn,
+                                  UIntArray &bn_count) {
 
-    delete[] valid_candidate_idx;
-    delete[] bn;
 }
 
 size_t
-EvaluateQuery::LFTJ(const Graph *data_graph, const Graph *query_graph, Edges ***edge_matrix, ui **candidates,
-                    ui *candidates_count,
-                    ui *order, size_t output_limit_num, size_t &call_count) {
+EvaluateQuery::LFTJ(const graph_ptr data_graph, const graph_ptr query_graph, EdgesPtrMatrix &edge_matrix, UIntMatrix &candidates,
+                    UIntArray &candidates_count,
+                    UIntArray &order, size_t output_limit_num, size_t &call_count) {
 
 #ifdef DISTRIBUTION
     distribution_count_ = new size_t[data_graph->getVerticesCount()];
@@ -311,18 +294,18 @@ EvaluateQuery::LFTJ(const Graph *data_graph, const Graph *query_graph, Edges ***
 #endif
 
     // Generate bn.
-    ui **bn;
-    ui *bn_count;
+    UIntMatrix bn;
+    UIntArray bn_count;
     generateBN(query_graph, order, bn, bn_count);
 
     // Allocate the memory buffer.
-    ui *idx;
-    ui *idx_count;
-    ui *embedding;
-    ui *idx_embedding;
-    ui *temp_buffer;
-    ui **valid_candidate_idx;
-    bool *visited_vertices;
+    UIntArray idx;
+    UIntArray idx_count;
+    UIntArray embedding;
+    UIntArray idx_embedding;
+    UIntArray temp_buffer;
+    UIntMatrix valid_candidate_idx;
+    BoolArray visited_vertices;
     allocateBuffer(data_graph, query_graph, candidates_count, idx, idx_count, embedding, idx_embedding,
                    temp_buffer, valid_candidate_idx, visited_vertices);
     std::vector<bool> found_embedding(query_graph->getVerticesCount(), false);
@@ -507,9 +490,9 @@ EvaluateQuery::LFTJ(const Graph *data_graph, const Graph *query_graph, Edges ***
     return embedding_cnt;
 }
 
-void EvaluateQuery::generateValidCandidateIndex(ui depth, ui *idx_embedding, ui *idx_count, ui **valid_candidate_index,
-                                                Edges ***edge_matrix, ui **bn, ui *bn_cnt, ui *order,
-                                                ui *&temp_buffer) {
+void EvaluateQuery::generateValidCandidateIndex(ui depth, UIntArray &idx_embedding, UIntArray &idx_count, UIntMatrix &valid_candidate_index,
+                                                EdgesPtrMatrix &edge_matrix, UIntMatrix &bn, UIntArray &bn_cnt, UIntArray &order,
+                                                UIntArray &temp_buffer) {
     VertexID u = order[depth];
     VertexID previous_bn = bn[depth][0];
     ui previous_index_id = idx_embedding[previous_bn];
@@ -609,9 +592,10 @@ void EvaluateQuery::generateValidCandidateIndex(ui depth, ui *idx_embedding, ui 
     Edges& previous_edge = *edge_matrix[previous_bn][u];
 
     valid_candidates_count = previous_edge.offset_[previous_index_id + 1] - previous_edge.offset_[previous_index_id];
-    ui* previous_candidates = previous_edge.edge_ + previous_edge.offset_[previous_index_id];
+    auto previous_candidates = previous_edge.edge_.begin() + previous_edge.offset_[previous_index_id];
 
-    memcpy(valid_candidate_index[depth], previous_candidates, valid_candidates_count * sizeof(ui));
+    // memcpy(valid_candidate_index[depth], previous_candidates, valid_candidates_count * sizeof(ui));
+    valid_candidate_index[depth].assign(previous_candidates, previous_candidates + valid_candidates_count);
 
     ui temp_count;
     for (ui i = 1; i < bn_cnt[depth]; ++i) {
@@ -620,12 +604,13 @@ void EvaluateQuery::generateValidCandidateIndex(ui depth, ui *idx_embedding, ui 
         ui current_index_id = idx_embedding[current_bn];
 
         ui current_candidates_count = current_edge.offset_[current_index_id + 1] - current_edge.offset_[current_index_id];
-        ui* current_candidates = current_edge.edge_ + current_edge.offset_[current_index_id];
+        ui* current_candidates = &current_edge.edge_[0] + current_edge.offset_[current_index_id];
 
-        ComputeSetIntersection::ComputeCandidates(current_candidates, current_candidates_count, valid_candidate_index[depth], valid_candidates_count,
-                        temp_buffer, temp_count);
+        ComputeSetIntersection::ComputeCandidates(current_candidates, current_candidates_count, &valid_candidate_index[depth][0], valid_candidates_count,
+                        &temp_buffer[0], temp_count);
 
-        std::swap(temp_buffer, valid_candidate_index[depth]);
+        valid_candidate_index[depth].assign(temp_buffer.begin(), temp_buffer.begin() + temp_count);
+        // std::swap(temp_buffer, valid_candidate_index[depth]);
         valid_candidates_count = temp_count;
     }
 
@@ -633,25 +618,25 @@ void EvaluateQuery::generateValidCandidateIndex(ui depth, ui *idx_embedding, ui 
 #endif
 }
 
-size_t EvaluateQuery::exploreGraphQLStyle(const Graph *data_graph, const Graph *query_graph, ui **candidates,
-                                          ui *candidates_count, ui *order,
+size_t EvaluateQuery::exploreGraphQLStyle(const graph_ptr data_graph, const graph_ptr query_graph, UIntMatrix &candidates,
+                                          UIntArray &candidates_count, UIntArray &order,
                                           size_t output_limit_num, size_t &call_count) {
     size_t embedding_cnt = 0;
     int cur_depth = 0;
-    int max_depth = query_graph->getVerticesCount();
+    ui max_depth = query_graph->getVerticesCount();
     VertexID start_vertex = order[0];
 
     // Generate the bn.
-    ui **bn;
-    ui *bn_count;
+    UIntMatrix bn;
+    UIntArray bn_count;
 
-    bn = new ui *[max_depth];
+    bn.resize(max_depth);
     for (ui i = 0; i < max_depth; ++i) {
-        bn[i] = new ui[max_depth];
+        bn[i].resize(max_depth);
     }
 
-    bn_count = new ui[max_depth];
-    std::fill(bn_count, bn_count + max_depth, 0);
+    bn_count.assign(max_depth, 0);
+    // std::fill(bn_count, bn_count + max_depth, 0);
 
     std::vector<bool> visited_query_vertices(max_depth, false);
     visited_query_vertices[start_vertex] = true;
@@ -672,34 +657,28 @@ size_t EvaluateQuery::exploreGraphQLStyle(const Graph *data_graph, const Graph *
     }
 
     // Allocate the memory buffer.
-    ui *idx;
-    ui *idx_count;
-    ui *embedding;
-    VertexID **valid_candidate;
-    bool *visited_vertices;
+    UIntArray idx(max_depth);
+    UIntArray idx_count(max_depth);
+    UIntArray embedding(max_depth);
+    UIntMatrix valid_candidate(max_depth);
+    BoolArray visited_vertices(data_graph->getVerticesCount(), false);
 
-    idx = new ui[max_depth];
-    idx_count = new ui[max_depth];
-    embedding = new ui[max_depth];
     std::vector<bool> found_embedding(max_depth, false);
     std::vector<u_int64_t> fail_count(query_graph->getVerticesCount(), 0);
     std::vector<u_int64_t> total_count(query_graph->getVerticesCount(), 0);
 
-    visited_vertices = new bool[data_graph->getVerticesCount()];
-    std::fill(visited_vertices, visited_vertices + data_graph->getVerticesCount(), false);
-    valid_candidate = new ui *[max_depth];
-
     for (ui i = 0; i < max_depth; ++i) {
         VertexID cur_vertex = order[i];
         ui max_candidate_count = candidates_count[cur_vertex];
-        valid_candidate[i] = new VertexID[max_candidate_count];
+        valid_candidate[i].resize(max_candidate_count);
     }
 
     idx[cur_depth] = 0;
     idx_count[cur_depth] = candidates_count[start_vertex];
     total_count[cur_depth] = candidates_count[start_vertex];
-    std::copy(candidates[start_vertex], candidates[start_vertex] + candidates_count[start_vertex],
-              valid_candidate[cur_depth]);
+
+    std::copy(candidates[start_vertex].begin(), candidates[start_vertex].begin() + candidates_count[start_vertex],
+              valid_candidate[cur_depth].begin());
 
     while (true) {
         while (idx[cur_depth] < idx_count[cur_depth]) {
@@ -755,27 +734,15 @@ size_t EvaluateQuery::exploreGraphQLStyle(const Graph *data_graph, const Graph *
 
     // Release the buffer.
     EXIT:
-    delete[] bn_count;
-    delete[] idx;
-    delete[] idx_count;
-    delete[] embedding;
-    delete[] visited_vertices;
-    for (ui i = 0; i < max_depth; ++i) {
-        delete[] bn[i];
-        delete[] valid_candidate[i];
-    }
-
-    delete[] bn;
-    delete[] valid_candidate;
 
     std::cout << "fail count: " << fail_count << std::endl;
     std::cout << "total count: " << total_count << std::endl;
     return embedding_cnt;
 }
 
-void EvaluateQuery::generateValidCandidates(const Graph *data_graph, ui depth, ui *embedding, ui *idx_count,
-                                            ui **valid_candidate, bool *visited_vertices, ui **bn, ui *bn_cnt,
-                                            ui *order, ui **candidates, ui *candidates_count) {
+void EvaluateQuery::generateValidCandidates(const graph_ptr data_graph, ui depth, UIntArray &embedding, UIntArray &idx_count,
+                                            UIntMatrix &valid_candidate, BoolArray &visited_vertices, UIntMatrix &bn, UIntArray &bn_cnt,
+                                            UIntArray &order, UIntMatrix &candidates, UIntArray &candidates_count) {
     VertexID u = order[depth];
 
     idx_count[depth] = 0;
@@ -803,47 +770,40 @@ void EvaluateQuery::generateValidCandidates(const Graph *data_graph, ui depth, u
     }
 }
 
-size_t EvaluateQuery::exploreQuickSIStyle(const Graph *data_graph, const Graph *query_graph, ui **candidates,
-                                          ui *candidates_count, ui *order,
-                                          ui *pivot, size_t output_limit_num, size_t &call_count) {
+size_t EvaluateQuery::exploreQuickSIStyle(const graph_ptr data_graph, const graph_ptr query_graph, UIntMatrix &candidates,
+                                          UIntArray &candidates_count, UIntArray &order,
+                                          UIntArray &pivot, size_t output_limit_num, size_t &call_count) {
     size_t embedding_cnt = 0;
     int cur_depth = 0;
-    int max_depth = query_graph->getVerticesCount();
+    ui max_depth = query_graph->getVerticesCount();
     VertexID start_vertex = order[0];
 
     // Generate the bn.
-    ui **bn;
-    ui *bn_count;
+    UIntMatrix bn;
+    UIntArray bn_count;
     generateBN(query_graph, order, pivot, bn, bn_count);
 
     // Allocate the memory buffer.
-    ui *idx;
-    ui *idx_count;
-    ui *embedding;
-    VertexID **valid_candidate;
-    bool *visited_vertices;
+    UIntArray idx(max_depth);
+    UIntArray idx_count(max_depth);
+    UIntArray embedding(max_depth);
+    UIntMatrix valid_candidate(max_depth);
+    BoolArray visited_vertices(data_graph->getVerticesCount(), false);
 
-    idx = new ui[max_depth];
-    idx_count = new ui[max_depth];
-    embedding = new ui[max_depth];
     std::vector<bool> found_embedding(query_graph->getVerticesCount(), false);
     std::vector<u_int64_t> fail_count(query_graph->getVerticesCount(), 0);
     std::vector<u_int64_t> total_count(query_graph->getVerticesCount(), 0);
 
-    visited_vertices = new bool[data_graph->getVerticesCount()];
-    std::fill(visited_vertices, visited_vertices + data_graph->getVerticesCount(), false);
-    valid_candidate = new ui *[max_depth];
-
     ui max_candidate_count = data_graph->getGraphMaxLabelFrequency();
     for (ui i = 0; i < max_depth; ++i) {
-        valid_candidate[i] = new VertexID[max_candidate_count];
+        valid_candidate[i].resize(max_candidate_count);
     }
 
     idx[cur_depth] = 0;
     idx_count[cur_depth] = candidates_count[start_vertex];
     total_count[cur_depth] = candidates_count[start_vertex];
-    std::copy(candidates[start_vertex], candidates[start_vertex] + candidates_count[start_vertex],
-              valid_candidate[cur_depth]);
+    std::copy(candidates[start_vertex].begin(), candidates[start_vertex].begin() + candidates_count[start_vertex],
+              valid_candidate[cur_depth].begin());
 
     while (true) {
         while (idx[cur_depth] < idx_count[cur_depth]) {
@@ -899,28 +859,15 @@ size_t EvaluateQuery::exploreQuickSIStyle(const Graph *data_graph, const Graph *
 
     // Release the buffer.
     EXIT:
-    delete[] bn_count;
-    delete[] idx;
-    delete[] idx_count;
-    delete[] embedding;
-    delete[] visited_vertices;
-    for (ui i = 0; i < max_depth; ++i) {
-        delete[] bn[i];
-        delete[] valid_candidate[i];
-    }
-
-    delete[] bn;
-    delete[] valid_candidate;
 
     std::cout << "fail count: " << fail_count << std::endl;
     std::cout << "total count: " << total_count << std::endl;
     return embedding_cnt;
 }
 
-void EvaluateQuery::generateValidCandidates(const Graph *query_graph, const Graph *data_graph, ui depth, ui *embedding,
-                                            ui *idx_count, ui **valid_candidate, bool *visited_vertices, ui **bn,
-                                            ui *bn_cnt,
-                                            ui *order, ui *pivot) {
+void EvaluateQuery::generateValidCandidates(const graph_ptr query_graph, const graph_ptr data_graph, ui depth, UIntArray &embedding,
+                                            UIntArray &idx_count, UIntMatrix &valid_candidate, BoolArray &visited_vertices, UIntMatrix &bn,
+                                            UIntArray &bn_cnt, UIntArray &order, UIntArray &pivot) {
     VertexID u = order[depth];
     LabelID u_label = query_graph->getVertexLabel(u);
     ui u_degree = query_graph->getVertexDegree(u);
@@ -955,30 +902,30 @@ void EvaluateQuery::generateValidCandidates(const Graph *query_graph, const Grap
     }
 }
 
-size_t EvaluateQuery::exploreDPisoStyle(const Graph *data_graph, const Graph *query_graph, TreeNode *tree,
-                                        Edges ***edge_matrix, ui **candidates, ui *candidates_count,
-                                        ui **weight_array, ui *order, size_t output_limit_num,
+size_t EvaluateQuery::exploreDPisoStyle(const graph_ptr data_graph, const graph_ptr query_graph, TreeNodeArray &tree,
+                                        EdgesPtrMatrix &edge_matrix, UIntMatrix &candidates, UIntArray &candidates_count,
+                                        UIntMatrix &weight_array, UIntArray &order, size_t output_limit_num,
                                         size_t &call_count) {
-    int max_depth = query_graph->getVerticesCount();
+    ui max_depth = query_graph->getVerticesCount();
 
-    ui *extendable = new ui[max_depth];
+    UIntArray extendable(max_depth);
     for (ui i = 0; i < max_depth; ++i) {
         extendable[i] = tree[i].bn_count_;
     }
 
     // Generate backward neighbors.
-    ui **bn;
-    ui *bn_count;
+    UIntMatrix bn;
+    UIntArray bn_count;
     generateBN(query_graph, order, bn, bn_count);
 
     // Allocate the memory buffer.
-    ui *idx;
-    ui *idx_count;
-    ui *embedding;
-    ui *idx_embedding;
-    ui *temp_buffer;
-    ui **valid_candidate_idx;
-    bool *visited_vertices;
+    UIntArray idx;
+    UIntArray idx_count;
+    UIntArray embedding;
+    UIntArray idx_embedding;
+    UIntArray temp_buffer;
+    UIntMatrix valid_candidate_idx;
+    BoolArray visited_vertices;
     allocateBuffer(data_graph, query_graph, candidates_count, idx, idx_count, embedding, idx_embedding,
                    temp_buffer, valid_candidate_idx, visited_vertices);
     std::vector<bool> found_embedding(query_graph->getVerticesCount(), false);
@@ -1157,10 +1104,10 @@ size_t EvaluateQuery::exploreDPisoStyle(const Graph *data_graph, const Graph *qu
     return embedding_cnt;
 }
 
-void EvaluateQuery::updateExtendableVertex(ui *idx_embedding, ui *idx_count, ui **valid_candidate_index,
-                                           Edges ***edge_matrix, ui *&temp_buffer, ui **weight_array,
-                                           TreeNode *tree, VertexID mapped_vertex, ui *extendable,
-                                           std::vector<dpiso_min_pq> &vec_rank_queue, const Graph *query_graph) {
+void EvaluateQuery::updateExtendableVertex(UIntArray &idx_embedding, UIntArray &idx_count, UIntMatrix &valid_candidate_index,
+                                           EdgesPtrMatrix &edge_matrix, UIntArray &temp_buffer, UIntMatrix &weight_array,
+                                           TreeNodeArray &tree, VertexID mapped_vertex, UIntArray &extendable,
+                                           std::vector<dpiso_min_pq> &vec_rank_queue, const graph_ptr query_graph) {
     TreeNode &node = tree[mapped_vertex];
     for (ui i = 0; i < node.fn_count_; ++i) {
         VertexID u = node.fn_[i];
@@ -1179,7 +1126,7 @@ void EvaluateQuery::updateExtendableVertex(ui *idx_embedding, ui *idx_count, ui 
     }
 }
 
-void EvaluateQuery::restoreExtendableVertex(TreeNode *tree, VertexID unmapped_vertex, ui *extendable) {
+void EvaluateQuery::restoreExtendableVertex(TreeNodeArray &tree, VertexID unmapped_vertex, UIntArray &extendable) {
     TreeNode &node = tree[unmapped_vertex];
     for (ui i = 0; i < node.fn_count_; ++i) {
         VertexID u = node.fn_[i];
@@ -1188,15 +1135,15 @@ void EvaluateQuery::restoreExtendableVertex(TreeNode *tree, VertexID unmapped_ve
 }
 
 void
-EvaluateQuery::generateValidCandidateIndex(VertexID u, ui *idx_embedding, ui *idx_count, ui *&valid_candidate_index,
-                                           Edges ***edge_matrix, ui *bn, ui bn_cnt, ui *&temp_buffer) {
+EvaluateQuery::generateValidCandidateIndex(VertexID u, UIntArray &idx_embedding, UIntArray &idx_count, UIntArray &valid_candidate_index,
+                                           EdgesPtrMatrix &edge_matrix, UIntArray &bn, ui bn_cnt, UIntArray &temp_buffer) {
     VertexID previous_bn = bn[0];
     Edges &previous_edge = *edge_matrix[previous_bn][u];
     ui previous_index_id = idx_embedding[previous_bn];
 
     ui previous_candidates_count =
             previous_edge.offset_[previous_index_id + 1] - previous_edge.offset_[previous_index_id];
-    ui *previous_candidates = previous_edge.edge_ + previous_edge.offset_[previous_index_id];
+    ui *previous_candidates = &previous_edge.edge_[0] + previous_edge.offset_[previous_index_id];
 
     ui valid_candidates_count = 0;
     for (ui i = 0; i < previous_candidates_count; ++i) {
@@ -1211,20 +1158,21 @@ EvaluateQuery::generateValidCandidateIndex(VertexID u, ui *idx_embedding, ui *id
 
         ui current_candidates_count =
                 current_edge.offset_[current_index_id + 1] - current_edge.offset_[current_index_id];
-        ui *current_candidates = current_edge.edge_ + current_edge.offset_[current_index_id];
+        ui *current_candidates = &current_edge.edge_[0] + current_edge.offset_[current_index_id];
 
-        ComputeSetIntersection::ComputeCandidates(current_candidates, current_candidates_count, valid_candidate_index,
+        ComputeSetIntersection::ComputeCandidates(current_candidates, current_candidates_count, &valid_candidate_index[0],
                                                   valid_candidates_count,
-                                                  temp_buffer, temp_count);
+                                                  &temp_buffer[0], temp_count);
 
-        std::swap(temp_buffer, valid_candidate_index);
+        valid_candidate_index.assign(temp_buffer.begin(), temp_buffer.begin() + temp_count);
+        // std::swap(temp_buffer, valid_candidate_index);
         valid_candidates_count = temp_count;
     }
 
     idx_count[u] = valid_candidates_count;
 }
 
-void EvaluateQuery::computeAncestor(const Graph *query_graph, TreeNode *tree, VertexID *order,
+void EvaluateQuery::computeAncestor(const graph_ptr query_graph, TreeNodeArray &tree, UIntArray &order,
                                     std::vector<std::bitset<MAXIMUM_QUERY_GRAPH_SIZE>> &ancestors) {
     ui query_vertices_num = query_graph->getVerticesCount();
     ancestors.resize(query_vertices_num);
@@ -1241,30 +1189,30 @@ void EvaluateQuery::computeAncestor(const Graph *query_graph, TreeNode *tree, Ve
     }
 }
 
-size_t EvaluateQuery::exploreDPisoRecursiveStyle(const Graph *data_graph, const Graph *query_graph, TreeNode *tree,
-                                                 Edges ***edge_matrix, ui **candidates, ui *candidates_count,
-                                                 ui **weight_array, ui *order, size_t output_limit_num,
+size_t EvaluateQuery::exploreDPisoRecursiveStyle(const graph_ptr data_graph, const graph_ptr query_graph, TreeNodeArray &tree,
+                                                 EdgesPtrMatrix &edge_matrix, UIntMatrix &candidates, UIntArray &candidates_count,
+                                                 UIntMatrix &weight_array, UIntArray &order, size_t output_limit_num,
                                                  size_t &call_count) {
-    int max_depth = query_graph->getVerticesCount();
+    ui max_depth = query_graph->getVerticesCount();
 
-    ui *extendable = new ui[max_depth];
+    UIntArray extendable(max_depth);
     for (ui i = 0; i < max_depth; ++i) {
         extendable[i] = tree[i].bn_count_;
     }
 
     // Generate backward neighbors.
-    ui **bn;
-    ui *bn_count;
+    UIntMatrix bn;
+    UIntArray bn_count;
     generateBN(query_graph, order, bn, bn_count);
 
     // Allocate the memory buffer.
-    ui *idx;
-    ui *idx_count;
-    ui *embedding;
-    ui *idx_embedding;
-    ui *temp_buffer;
-    ui **valid_candidate_idx;
-    bool *visited_vertices;
+    UIntArray idx;
+    UIntArray idx_count;
+    UIntArray embedding;
+    UIntArray idx_embedding;
+    UIntArray temp_buffer;
+    UIntMatrix valid_candidate_idx;
+    BoolArray visited_vertices;
     allocateBuffer(data_graph, query_graph, candidates_count, idx, idx_count, embedding, idx_embedding,
                    temp_buffer, valid_candidate_idx, visited_vertices);
 
@@ -1305,14 +1253,14 @@ size_t EvaluateQuery::exploreDPisoRecursiveStyle(const Graph *data_graph, const 
 }
 
 std::bitset<MAXIMUM_QUERY_GRAPH_SIZE>
-EvaluateQuery::exploreDPisoBacktrack(ui max_depth, ui depth, VertexID mapped_vertex, TreeNode *tree, ui *idx_embedding,
-                                     ui *embedding, std::unordered_map<VertexID, VertexID> &reverse_embedding,
-                                     bool *visited_vertices, ui *idx_count, ui **valid_candidate_index,
-                                     Edges ***edge_matrix,
+EvaluateQuery::exploreDPisoBacktrack(ui max_depth, ui depth, VertexID mapped_vertex, TreeNodeArray &tree, UIntArray &idx_embedding,
+                                     UIntArray &embedding, std::unordered_map<VertexID, VertexID> &reverse_embedding,
+                                     BoolArray &visited_vertices, UIntArray &idx_count, UIntMatrix &valid_candidate_index,
+                                     EdgesPtrMatrix &edge_matrix,
                                      std::vector<std::bitset<MAXIMUM_QUERY_GRAPH_SIZE>> &ancestors,
-                                     dpiso_min_pq rank_queue, ui **weight_array, ui *&temp_buffer, ui *extendable,
-                                     ui **candidates, size_t &embedding_count, size_t &call_count,
-                                     const Graph *query_graph) {
+                                     dpiso_min_pq rank_queue, UIntMatrix &weight_array, UIntArray &temp_buffer, UIntArray &extendable,
+                                     UIntMatrix &candidates, size_t &embedding_count, size_t &call_count,
+                                     const graph_ptr query_graph) {
     // Compute extendable vertex.
     TreeNode &node = tree[mapped_vertex];
     for (ui i = 0; i < node.fn_count_; ++i) {
@@ -1384,27 +1332,27 @@ EvaluateQuery::exploreDPisoBacktrack(ui max_depth, ui depth, VertexID mapped_ver
 }
 
 size_t
-EvaluateQuery::exploreCECIStyle(const Graph *data_graph, const Graph *query_graph, TreeNode *tree, ui **candidates,
-                                ui *candidates_count,
+EvaluateQuery::exploreCECIStyle(const graph_ptr data_graph, const graph_ptr query_graph, TreeNodeArray &tree, UIntMatrix &candidates,
+                                UIntArray &candidates_count,
                                 std::vector<std::unordered_map<VertexID, std::vector<VertexID>>> &TE_Candidates,
                                 std::vector<std::vector<std::unordered_map<VertexID, std::vector<VertexID>>>> &NTE_Candidates,
-                                ui *order, size_t &output_limit_num, size_t &call_count) {
+                                UIntArray &order, size_t &output_limit_num, size_t &call_count) {
 
     int max_depth = query_graph->getVerticesCount();
     ui data_vertices_count = data_graph->getVerticesCount();
     // temporal results may be large, use maximum possible size
     ui max_valid_candidates_count = data_graph->getGraphMaxLabelFrequency();
     // Allocate the memory buffer.
-    ui *idx = new ui[max_depth];
-    ui *idx_count = new ui[max_depth];
-    ui *embedding = new ui[max_depth];
-    ui *temp_buffer = new ui[max_valid_candidates_count];
-    ui **valid_candidates = new ui *[max_depth];
+    UIntArray idx(max_depth);
+    UIntArray idx_count(max_depth);
+    UIntArray embedding(max_depth);
+    UIntArray temp_buffer(max_valid_candidates_count);
+    UIntMatrix valid_candidates(max_depth);
     for (int i = 0; i < max_depth; ++i) {
-        valid_candidates[i] = new ui[max_valid_candidates_count];
+        valid_candidates[i].resize(max_valid_candidates_count);
     }
-    bool *visited_vertices = new bool[data_vertices_count];
-    std::fill(visited_vertices, visited_vertices + data_vertices_count, false);
+    BoolArray visited_vertices(data_vertices_count, false);
+    // std::fill(visited_vertices, visited_vertices + data_vertices_count, false);
     std::vector<bool> found_embedding(query_graph->getVerticesCount(), false);
     std::vector<u_int64_t> fail_count(query_graph->getVerticesCount(), 0);
     std::vector<u_int64_t> total_count(query_graph->getVerticesCount(), 0);
@@ -1522,28 +1470,19 @@ EvaluateQuery::exploreCECIStyle(const Graph *data_graph, const Graph *query_grap
 
     // Release the buffer.
     EXIT:
-    delete[] idx;
-    delete[] idx_count;
-    delete[] embedding;
-    delete[] temp_buffer;
-    delete[] visited_vertices;
-    for (int i = 0; i < max_depth; ++i) {
-        delete[] valid_candidates[i];
-    }
-    delete[] valid_candidates;
 
     std::cout << "fail count: " << fail_count << std::endl;
     std::cout << "total count: " << total_count << std::endl;
     return embedding_cnt;
 }
 
-void EvaluateQuery::generateValidCandidates(ui depth, ui *embedding, ui *idx_count, ui **valid_candidates, ui *order,
-                                            ui *&temp_buffer, TreeNode *tree,
+void EvaluateQuery::generateValidCandidates(ui depth, UIntArray &embedding, UIntArray &idx_count, UIntMatrix &valid_candidates, UIntArray &order,
+                                            UIntArray &temp_buffer, TreeNodeArray &tree,
                                             std::vector<std::unordered_map<VertexID, std::vector<VertexID>>> &TE_Candidates,
                                             std::vector<std::vector<std::unordered_map<VertexID, std::vector<VertexID>>>> &NTE_Candidates) {
 
     VertexID u = order[depth];
-    TreeNode &u_node = tree[u];
+    // TreeNode &u_node = tree[u];
     idx_count[depth] = 0;
     ui valid_candidates_count = 0;
     {
@@ -1576,20 +1515,21 @@ void EvaluateQuery::generateValidCandidates(ui depth, ui *embedding, ui *idx_cou
         }
 
         ui current_candidates_count = iter->second.size();
-        ui *current_candidates = iter->second.data();
+        UIntArray &current_candidates = iter->second;
 
-        ComputeSetIntersection::ComputeCandidates(current_candidates, current_candidates_count,
-                                                  valid_candidates[depth], valid_candidates_count,
-                                                  temp_buffer, temp_count);
+        ComputeSetIntersection::ComputeCandidates(&current_candidates[0], current_candidates_count,
+                                                  &valid_candidates[depth][0], valid_candidates_count,
+                                                  &temp_buffer[0], temp_count);
 
-        std::swap(temp_buffer, valid_candidates[depth]);
+        valid_candidates[depth].assign(temp_buffer.begin(), temp_buffer.begin() + temp_count);
+        // std::swap(temp_buffer, valid_candidates[depth]);
         valid_candidates_count = temp_count;
     }
 
     idx_count[depth] = valid_candidates_count;
 }
 
-void EvaluateQuery::computeAncestor(const Graph *query_graph, ui **bn, ui *bn_cnt, VertexID *order,
+void EvaluateQuery::computeAncestor(const graph_ptr query_graph, UIntMatrix &bn, UIntArray &bn_cnt, UIntArray &order,
                                     std::vector<std::bitset<MAXIMUM_QUERY_GRAPH_SIZE>> &ancestors) {
     ui query_vertices_num = query_graph->getVerticesCount();
     ancestors.resize(query_vertices_num);
@@ -1605,7 +1545,7 @@ void EvaluateQuery::computeAncestor(const Graph *query_graph, ui **bn, ui *bn_cn
     }
 }
 
-void EvaluateQuery::computeAncestor(const Graph *query_graph, VertexID *order,
+void EvaluateQuery::computeAncestor(const graph_ptr query_graph, UIntArray &order,
                                     std::vector<std::bitset<MAXIMUM_QUERY_GRAPH_SIZE>> &ancestors) {
     ui query_vertices_num = query_graph->getVerticesCount();
     ancestors.resize(query_vertices_num);

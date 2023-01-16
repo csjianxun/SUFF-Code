@@ -7,17 +7,16 @@
 #include <queue>
 #include <utility/graphoperations.h>
 
-void GenerateFilteringPlan::generateTSOFilterPlan(const Graph *data_graph, const Graph *query_graph, TreeNode *&tree,
-                                                   VertexID *&order) {
+void GenerateFilteringPlan::generateTSOFilterPlan(const graph_ptr data_graph, const graph_ptr query_graph, TreeNodeArray &tree,
+                                                   UIntArray &order) {
     VertexID start_vertex = selectTSOFilterStartVertex(data_graph, query_graph);
-    VertexID* bfs_order;
+    UIntArray bfs_order;
     GraphOperations::bfsTraversal(query_graph, start_vertex, tree, bfs_order);
     GraphOperations::dfsTraversal(tree, start_vertex, query_graph->getVerticesCount(), order);
-    delete[] bfs_order;
 }
 
-void GenerateFilteringPlan::generateCFLFilterPlan(const Graph *data_graph, const Graph *query_graph, TreeNode *&tree,
-                                                  VertexID *&order, int &level_count, ui *&level_offset) {
+void GenerateFilteringPlan::generateCFLFilterPlan(const graph_ptr data_graph, const graph_ptr query_graph, TreeNodeArray &tree,
+                                                  UIntArray &order, int &level_count, UIntArray &level_offset) {
     ui query_vertices_num = query_graph->getVerticesCount();
     VertexID start_vertex = selectCFLFilterStartVertex(data_graph, query_graph);
     GraphOperations::bfsTraversal(query_graph, start_vertex, tree, order);
@@ -29,7 +28,7 @@ void GenerateFilteringPlan::generateCFLFilterPlan(const Graph *data_graph, const
     }
 
     level_count = -1;
-    level_offset = new ui[query_vertices_num + 1];
+    level_offset.resize(query_vertices_num + 1);
 
     for (ui i = 0; i < query_vertices_num; ++i) {
         VertexID u = order[i];
@@ -77,8 +76,8 @@ void GenerateFilteringPlan::generateCFLFilterPlan(const Graph *data_graph, const
     level_offset[0] = 0;
 }
 
-void GenerateFilteringPlan::generateDPisoFilterPlan(const Graph *data_graph, const Graph *query_graph, TreeNode *&tree,
-                                                    VertexID *&order) {
+void GenerateFilteringPlan::generateDPisoFilterPlan(const graph_ptr data_graph, const graph_ptr query_graph, TreeNodeArray &tree,
+                                                    UIntArray &order) {
     VertexID start_vertex = selectDPisoStartVertex(data_graph, query_graph);
     GraphOperations::bfsTraversal(query_graph, start_vertex, tree, order);
 
@@ -109,8 +108,8 @@ void GenerateFilteringPlan::generateDPisoFilterPlan(const Graph *data_graph, con
     }
 }
 
-void GenerateFilteringPlan::generateCECIFilterPlan(const Graph *data_graph, const Graph *query_graph, TreeNode *&tree,
-                                                   VertexID *&order) {
+void GenerateFilteringPlan::generateCECIFilterPlan(const graph_ptr data_graph, const graph_ptr query_graph, TreeNodeArray &tree,
+                                                   UIntArray &order) {
     VertexID start_vertex = selectCECIStartVertex(data_graph, query_graph);
     GraphOperations::bfsTraversal(query_graph, start_vertex, tree, order);
 
@@ -140,7 +139,7 @@ void GenerateFilteringPlan::generateCECIFilterPlan(const Graph *data_graph, cons
 }
 
 
-VertexID GenerateFilteringPlan::selectTSOFilterStartVertex(const Graph *data_graph, const Graph *query_graph) {
+VertexID GenerateFilteringPlan::selectTSOFilterStartVertex(const graph_ptr data_graph, const graph_ptr query_graph) {
     auto rank_compare = [](std::pair<VertexID, double> l, std::pair<VertexID, double> r) {
         return l.second < r.second;
     };
@@ -165,12 +164,13 @@ VertexID GenerateFilteringPlan::selectTSOFilterStartVertex(const Graph *data_gra
     // Pick the one with the smallest number of candidates.
     VertexID start_vertex = 0;
     ui min_candidates_num = data_graph->getGraphMaxLabelFrequency() + 1;
+    UIntArray placeholder;
     while (!rank_queue.empty()) {
         VertexID query_vertex = rank_queue.top().first;
 
         if (rank_queue.size() == 1) {
             ui count;
-            FilterVertices::computeCandidateWithNLF(data_graph, query_graph, query_vertex, count);
+            FilterVertices::computeCandidateWithNLF(data_graph, query_graph, query_vertex, count, placeholder);
             if (count < min_candidates_num) {
                 start_vertex = query_vertex;
             }
@@ -180,7 +180,7 @@ VertexID GenerateFilteringPlan::selectTSOFilterStartVertex(const Graph *data_gra
             ui frequency = data_graph->getLabelsFrequency(label);
             if (frequency / (double)data_graph->getVerticesCount() <= 0.05) {
                 ui count;
-                FilterVertices::computeCandidateWithNLF(data_graph, query_graph, query_vertex, count);
+                FilterVertices::computeCandidateWithNLF(data_graph, query_graph, query_vertex, count, placeholder);
                 if (count < min_candidates_num) {
                     start_vertex = query_vertex;
                     min_candidates_num = count;
@@ -193,7 +193,7 @@ VertexID GenerateFilteringPlan::selectTSOFilterStartVertex(const Graph *data_gra
     return start_vertex;
 }
 
-VertexID GenerateFilteringPlan::selectCFLFilterStartVertex(const Graph *data_graph, const Graph *query_graph) {
+VertexID GenerateFilteringPlan::selectCFLFilterStartVertex(const graph_ptr data_graph, const graph_ptr query_graph) {
     auto rank_compare = [](std::pair<VertexID, double> l, std::pair<VertexID, double> r) {
         return l.second < r.second;
     };
@@ -220,11 +220,11 @@ VertexID GenerateFilteringPlan::selectCFLFilterStartVertex(const Graph *data_gra
 
     VertexID start_vertex = 0;
     double min_score = data_graph->getGraphMaxLabelFrequency() + 1;
-
+    UIntArray placeholder;
     while (!rank_queue.empty()) {
         VertexID query_vertex = rank_queue.top().first;
         ui count;
-        FilterVertices::computeCandidateWithNLF(data_graph, query_graph, query_vertex, count);
+        FilterVertices::computeCandidateWithNLF(data_graph, query_graph, query_vertex, count, placeholder);
         double cur_score = count / (double) query_graph->getVertexDegree(query_vertex);
 
         if (cur_score < min_score) {
@@ -237,17 +237,17 @@ VertexID GenerateFilteringPlan::selectCFLFilterStartVertex(const Graph *data_gra
     return start_vertex;
 }
 
-VertexID GenerateFilteringPlan::selectDPisoStartVertex(const Graph *data_graph, const Graph *query_graph) {
+VertexID GenerateFilteringPlan::selectDPisoStartVertex(const graph_ptr data_graph, const graph_ptr query_graph) {
     double min_score = data_graph->getVerticesCount();
     VertexID start_vertex = 0;
-
+    UIntArray placeholder;
     for (ui i = 0; i < query_graph->getVerticesCount(); ++i) {
         ui degree = query_graph->getVertexDegree(i);
         if (degree <= 1)
             continue;
 
         ui count = 0;
-        FilterVertices::computeCandidateWithLDF(data_graph, query_graph, i, count);
+        FilterVertices::computeCandidateWithLDF(data_graph, query_graph, i, count, placeholder);
         double cur_score = count / (double)degree;
         if (cur_score < min_score) {
             min_score = cur_score;
@@ -258,14 +258,14 @@ VertexID GenerateFilteringPlan::selectDPisoStartVertex(const Graph *data_graph, 
     return start_vertex;
 }
 
-VertexID GenerateFilteringPlan::selectCECIStartVertex(const Graph *data_graph, const Graph *query_graph) {
+VertexID GenerateFilteringPlan::selectCECIStartVertex(const graph_ptr data_graph, const graph_ptr query_graph) {
     double min_score = data_graph->getVerticesCount();
     VertexID start_vertex = 0;
-
+    UIntArray placeholder;
     for (ui i = 0; i < query_graph->getVerticesCount(); ++i) {
         ui degree = query_graph->getVertexDegree(i);
         ui count = 0;
-        FilterVertices::computeCandidateWithNLF(data_graph, query_graph, i, count);
+        FilterVertices::computeCandidateWithNLF(data_graph, query_graph, i, count, placeholder);
         double cur_score = count / (double)degree;
         if (cur_score < min_score) {
             min_score = cur_score;

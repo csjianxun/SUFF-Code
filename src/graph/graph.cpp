@@ -9,8 +9,8 @@
 #include <chrono>
 
 void Graph::BuildReverseIndex() {
-    reverse_index_ = new ui[vertices_count_];
-    reverse_index_offsets_= new ui[labels_count_ + 1];
+    reverse_index_.resize(vertices_count_);
+    reverse_index_offsets_.resize(labels_count_ + 1);
     reverse_index_offsets_[0] = 0;
 
     ui total = 0;
@@ -27,7 +27,7 @@ void Graph::BuildReverseIndex() {
 
 #if OPTIMIZED_LABELED_GRAPH == 1
 void Graph::BuildNLF() {
-    nlf_ = new std::unordered_map<LabelID, ui>[vertices_count_];
+    nlf_.resize(vertices_count_);
     for (ui i = 0; i < vertices_count_; ++i) {
         ui count;
         const VertexID * neighbors = getVertexNeighbors(i, count);
@@ -46,11 +46,11 @@ void Graph::BuildNLF() {
 
 void Graph::BuildLabelOffset() {
     size_t labels_offset_size = (size_t)vertices_count_ * labels_count_ + 1;
-    labels_offsets_ = new ui[labels_offset_size];
-    std::fill(labels_offsets_, labels_offsets_ + labels_offset_size, 0);
+    labels_offsets_.assign(labels_offset_size, 0);
+    // std::fill(labels_offsets_, labels_offsets_ + labels_offset_size, 0);
 
     for (ui i = 0; i < vertices_count_; ++i) {
-        std::sort(neighbors_ + offsets_[i], neighbors_ + offsets_[i + 1],
+        std::sort(&neighbors_[offsets_[i]], &neighbors_[offsets_[i + 1]],
             [this](const VertexID u, const VertexID v) -> bool {
                 return labels_[u] == labels_[v] ? u < v : labels_[u] < labels_[v];
             });
@@ -92,13 +92,14 @@ void Graph::loadGraphFromFile(const std::string &file_path) {
 
     char type;
     infile >> type >> vertices_count_ >> edges_count_;
-    offsets_ = new ui[vertices_count_ +  1];
+    offsets_.resize(vertices_count_ +  1);
     offsets_[0] = 0;
 
-    neighbors_ = new VertexID[edges_count_ * 2];
-    labels_ = new LabelID[vertices_count_];
+    neighbors_.resize(edges_count_ * 2);
+    labels_.resize(vertices_count_);
     labels_count_ = 0;
     max_degree_ = 0;
+    min_degree_ = -1;
 
     LabelID max_label_id = 0;
     std::vector<ui> neighbors_offset(vertices_count_, 0);
@@ -115,6 +116,10 @@ void Graph::loadGraphFromFile(const std::string &file_path) {
 
             if (degree > max_degree_) {
                 max_degree_ = degree;
+            }
+
+            if (degree < min_degree_ || min_degree_ < 0) {
+                min_degree_ = degree;
             }
 
             if (labels_frequency_.find(label) == labels_frequency_.end()) {
@@ -151,7 +156,7 @@ void Graph::loadGraphFromFile(const std::string &file_path) {
     }
 
     for (ui i = 0; i < vertices_count_; ++i) {
-        std::sort(neighbors_ + offsets_[i], neighbors_ + offsets_[i + 1]);
+        std::sort(&neighbors_[offsets_[i]], &neighbors_[offsets_[i + 1]]);
     }
 
     BuildReverseIndex();
@@ -167,11 +172,11 @@ void Graph::loadGraphFromFile(const std::string &file_path) {
 void Graph::loadGraphFromBinaryFile(std::ifstream &file) {
     file.read((char *)&vertices_count_, sizeof(vertices_count_));
     file.read((char *)&edges_count_, sizeof(edges_count_));
-    offsets_ = new ui[vertices_count_ +  1];
+    offsets_.resize(vertices_count_ +  1);
     offsets_[0] = 0;
 
-    neighbors_ = new VertexID[edges_count_ * 2];
-    labels_ = new LabelID[vertices_count_];
+    neighbors_.resize(edges_count_ * 2);
+    labels_.resize(vertices_count_);
     labels_count_ = 0;
     max_degree_ = 0;
 
@@ -228,7 +233,7 @@ void Graph::loadGraphFromBinaryFile(std::ifstream &file) {
     }
 
     for (ui i = 0; i < vertices_count_; ++i) {
-        std::sort(neighbors_ + offsets_[i], neighbors_ + offsets_[i + 1]);
+        std::sort(&neighbors_[offsets_[i]], &neighbors_[offsets_[i + 1]]);
     }
 
     BuildReverseIndex();
@@ -268,18 +273,18 @@ void Graph::printGraphMetaData() {
     std::cout << "Max Degree: " << max_degree_ << ", Max Label Frequency: " << max_label_frequency_ << std::endl;
 }
 
-int *Graph::getKCore() {
-    int *core_table = new int[vertices_count_];
+IntArray Graph::getKCore() {
+    IntArray core_table(vertices_count_);
 
     int vertices_count = getVerticesCount();
     int max_degree = getGraphMaxDegree();
 
-    int* vertices = new int[vertices_count];          // Vertices sorted by degree.
-    int* position = new int[vertices_count];          // The position of vertices in vertices array.
-    int* degree_bin = new int[max_degree + 1];      // Degree from 0 to max_degree.
-    int* offset = new int[max_degree + 1];          // The offset in vertices array according to degree.
+    IntArray vertices(vertices_count);          // Vertices sorted by degree.
+    IntArray position(vertices_count);          // The position of vertices in vertices array.
+    IntArray degree_bin(max_degree + 1, 0);      // Degree from 0 to max_degree.
+    IntArray offset(max_degree + 1);          // The offset in vertices array according to degree.
 
-    std::fill(degree_bin, degree_bin + (max_degree + 1), 0);
+    // std::fill(degree_bin, degree_bin + (max_degree + 1), 0);
 
     for (int i = 0; i < vertices_count; ++i) {
         int degree = getVertexDegree(i);
@@ -337,11 +342,6 @@ int *Graph::getKCore() {
         }
     }
 
-    delete[] vertices;
-    delete[] position;
-    delete[] degree_bin;
-    delete[] offset;
-
     return core_table;
 }
 
@@ -373,10 +373,10 @@ void Graph::loadGraphFromFileCompressed(const std::string &degree_path, const st
     deg_file.read(reinterpret_cast<char *>(&vertices_count_), 4);
     deg_file.read(reinterpret_cast<char *>(&edges_count_), 4);
 
-    offsets_ = new ui[vertices_count_ + 1];
-    ui* degrees = new unsigned int[vertices_count_];
+    offsets_.resize(vertices_count_ + 1);
+    UIntArray degrees(vertices_count_);
 
-    deg_file.read(reinterpret_cast<char *>(degrees), sizeof(int) * vertices_count_);
+    deg_file.read(reinterpret_cast<char *>(&degrees[0]), sizeof(int) * vertices_count_);
 
 
     deg_file.close();
@@ -397,7 +397,7 @@ void Graph::loadGraphFromFileCompressed(const std::string &degree_path, const st
 
     start = std::chrono::high_resolution_clock::now();
     size_t neighbors_count = (size_t)edges_count_ * 2;
-    neighbors_ = new ui[neighbors_count];
+    neighbors_.resize(neighbors_count);
 
     offsets_[0] = 0;
     for (ui i = 1; i <= vertices_count_; ++i) {
@@ -410,15 +410,13 @@ void Graph::loadGraphFromFileCompressed(const std::string &degree_path, const st
         if (degrees[i] > 0) {
             if (degrees[i] > max_degree_)
                 max_degree_ = degrees[i];
-            adj_file.read(reinterpret_cast<char *>(neighbors_ + offsets_[i]), degrees[i] * sizeof(int));
-            std::sort(neighbors_ + offsets_[i], neighbors_ + offsets_[i + 1]);
+            adj_file.read(reinterpret_cast<char *>(&neighbors_[offsets_[i]]), degrees[i] * sizeof(int));
+            std::sort(&neighbors_[offsets_[i]], &neighbors_[offsets_[i + 1]]);
         }
     }
 
     adj_file.close();
     adj_file.clear();
-
-    delete[] degrees;
 
     end = std::chrono::high_resolution_clock::now();
     std::cout << "Load adj file time: " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << " seconds" << std::endl;
@@ -435,8 +433,8 @@ void Graph::loadGraphFromFileCompressed(const std::string &degree_path, const st
 
     start = std::chrono::high_resolution_clock::now();
 
-    labels_ = new ui[vertices_count_];
-    label_file.read(reinterpret_cast<char *>(labels_), sizeof(int) * vertices_count_);
+    labels_.resize(vertices_count_);
+    label_file.read(reinterpret_cast<char *>(&labels_[0]), sizeof(int) * vertices_count_);
 
     label_file.close();
     label_file.clear();
@@ -479,7 +477,7 @@ void Graph::loadGraphFromFileCompressed(const std::string &degree_path, const st
 
 void Graph::storeComparessedGraph(const std::string& degree_path, const std::string& edge_path,
                                   const std::string& label_path) {
-    ui* degrees = new ui[vertices_count_];
+    UIntArray degrees(vertices_count_);
     for (ui i = 0; i < vertices_count_; ++i) {
         degrees[i] = offsets_[i + 1] - offsets_[i];
     }
@@ -499,12 +497,10 @@ void Graph::storeComparessedGraph(const std::string& degree_path, const std::str
     deg_outputfile.write(reinterpret_cast<const char *>(&int_size), 4);
     deg_outputfile.write(reinterpret_cast<const char *>(&vertices_count_), 4);
     deg_outputfile.write(reinterpret_cast<const char *>(&edges_count_), 4);
-    deg_outputfile.write(reinterpret_cast<const char *>(degrees), vertex_array_bytes);
+    deg_outputfile.write(reinterpret_cast<const char *>(&degrees[0]), vertex_array_bytes);
 
     deg_outputfile.close();
     deg_outputfile.clear();
-
-    delete[] degrees;
 
     std::ofstream edge_outputfile(edge_path, std::ios::binary);
 
@@ -517,7 +513,7 @@ void Graph::storeComparessedGraph(const std::string& degree_path, const std::str
     }
 
     size_t edge_array_bytes = ((size_t)edges_count_ * 2) * 4;
-    edge_outputfile.write(reinterpret_cast<const char *>(neighbors_), edge_array_bytes);
+    edge_outputfile.write(reinterpret_cast<const char *>(&neighbors_[0]), edge_array_bytes);
 
     edge_outputfile.close();
     edge_outputfile.clear();
@@ -533,7 +529,7 @@ void Graph::storeComparessedGraph(const std::string& degree_path, const std::str
     }
 
     size_t label_array_bytes = ((size_t)vertices_count_) * 4;
-    label_outputfile.write(reinterpret_cast<const char *>(labels_), label_array_bytes);
+    label_outputfile.write(reinterpret_cast<const char *>(&labels_[0]), label_array_bytes);
 
     label_outputfile.close();
     label_outputfile.clear();

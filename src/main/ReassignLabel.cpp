@@ -1,7 +1,3 @@
-//
-// Created by ssunah on 10/31/19.
-//
-
 #include <cassert>
 #include <algorithm>
 #include <vector>

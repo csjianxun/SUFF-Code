@@ -10,15 +10,15 @@
 #include <algorithm>
 #include <utility/graphoperations.h>
 
-void GenerateQueryPlan::generateGQLQueryPlan(const Graph *data_graph, const Graph *query_graph, ui *candidates_count,
-                                             ui *&order, ui *&pivot) {
+void GenerateQueryPlan::generateGQLQueryPlan(const graph_ptr data_graph, const graph_ptr query_graph, UIntArray &candidates_count,
+                                             UIntArray &order, UIntArray &pivot) {
      /**
       * Select the vertex v such that (1) v is adjacent to the selected vertices; and (2) v has the minimum number of candidates.
       */
      std::vector<bool> visited_vertices(query_graph->getVerticesCount(), false);
      std::vector<bool> adjacent_vertices(query_graph->getVerticesCount(), false);
-     order = new ui[query_graph->getVerticesCount()];
-     pivot = new ui[query_graph->getVerticesCount()];
+     order.resize(query_graph->getVerticesCount());
+     pivot.resize(query_graph->getVerticesCount());
 
      VertexID start_vertex = selectGQLStartVertex(query_graph, candidates_count);
      order[0] = start_vertex;
@@ -57,15 +57,15 @@ void GenerateQueryPlan::generateGQLQueryPlan(const Graph *data_graph, const Grap
      }
 }
 
-void GenerateQueryPlan::generateQSIQueryPlan(const Graph *data_graph, const Graph *query_graph, Edges ***edge_matrix,
-                                             ui *&order, ui *&pivot) {
+void GenerateQueryPlan::generateQSIQueryPlan(const graph_ptr data_graph, const graph_ptr query_graph, EdgesPtrMatrix &edge_matrix,
+                                             UIntArray &order, UIntArray &pivot) {
      /**
       * Generate a minimum spanning tree.
       */
      std::vector<bool> visited_vertices(query_graph->getVerticesCount(), false);
      std::vector<bool> adjacent_vertices(query_graph->getVerticesCount(), false);
-     order = new ui[query_graph->getVerticesCount()];
-     pivot = new ui[query_graph->getVerticesCount()];
+     order.resize(query_graph->getVerticesCount());
+     pivot.resize(query_graph->getVerticesCount());
 
      std::pair<VertexID, VertexID> start_edge = selectQSIStartEdge(query_graph, edge_matrix);
      order[0] = start_edge.first;
@@ -121,7 +121,7 @@ void GenerateQueryPlan::generateQSIQueryPlan(const Graph *data_graph, const Grap
      }
 }
 
-VertexID GenerateQueryPlan::selectGQLStartVertex(const Graph *query_graph, ui *candidates_count) {
+VertexID GenerateQueryPlan::selectGQLStartVertex(const graph_ptr query_graph, UIntArray &candidates_count) {
     /**
      * Select the vertex with the minimum number of candidates as the start vertex.
      * Tie Handling:
@@ -146,8 +146,8 @@ VertexID GenerateQueryPlan::selectGQLStartVertex(const Graph *query_graph, ui *c
      return start_vertex;
 }
 
-void GenerateQueryPlan::updateValidVertices(const Graph *query_graph, VertexID query_vertex, std::vector<bool> &visited,
-                                            std::vector<bool> &adjacent) {
+void GenerateQueryPlan::updateValidVertices(const graph_ptr query_graph, VertexID query_vertex, BoolArray &visited,
+                                            BoolArray &adjacent) {
      visited[query_vertex] = true;
      ui nbr_cnt;
      const ui* nbrs = query_graph->getVertexNeighbors(query_vertex, nbr_cnt);
@@ -158,7 +158,7 @@ void GenerateQueryPlan::updateValidVertices(const Graph *query_graph, VertexID q
      }
 }
 
-std::pair<VertexID, VertexID> GenerateQueryPlan::selectQSIStartEdge(const Graph *query_graph, Edges ***edge_matrix) {
+std::pair<VertexID, VertexID> GenerateQueryPlan::selectQSIStartEdge(const graph_ptr query_graph, EdgesPtrMatrix &edge_matrix) {
      /**
       * Select the edge with the minimum number of candidate edges.
       * Tie Handling:
@@ -193,8 +193,8 @@ std::pair<VertexID, VertexID> GenerateQueryPlan::selectQSIStartEdge(const Graph 
      return start_edge;
 }
 
-void GenerateQueryPlan::generateTSOQueryPlan(const Graph *query_graph, Edges ***edge_matrix, ui *&order, ui *&pivot,
-                                             TreeNode *tree, ui *dfs_order) {
+void GenerateQueryPlan::generateTSOQueryPlan(const graph_ptr query_graph, EdgesPtrMatrix &edge_matrix, UIntArray &order, UIntArray &pivot,
+                                             TreeNodeArray &tree, UIntArray &dfs_order) {
     /**
      * Order the root to leaf paths according to the estimated number of embeddings and generate the matching order.
      */
@@ -223,8 +223,8 @@ void GenerateQueryPlan::generateTSOQueryPlan(const Graph *query_graph, Edges ***
     { return l.first < r.first; });
 
     std::vector<bool> visited_vertices(query_vertices_num, false);
-    order = new ui[query_vertices_num];
-    pivot = new ui[query_vertices_num];
+    order.resize(query_vertices_num);
+    pivot.resize(query_vertices_num);
 
     ui count = 0;
     for (auto& path : path_orders) {
@@ -242,12 +242,12 @@ void GenerateQueryPlan::generateTSOQueryPlan(const Graph *query_graph, Edges ***
     }
 }
 
-void GenerateQueryPlan::generateCFLQueryPlan(const Graph *data_graph, const Graph *query_graph, Edges ***edge_matrix,
-                                             ui *&order, ui *&pivot, TreeNode *tree, ui *bfs_order, ui *candidates_count) {
+void GenerateQueryPlan::generateCFLQueryPlan(const graph_ptr data_graph, const graph_ptr query_graph, EdgesPtrMatrix &edge_matrix,
+                                             UIntArray &order, UIntArray &pivot, TreeNodeArray &tree, UIntArray &bfs_order, UIntArray &candidates_count) {
     ui query_vertices_num = query_graph->getVerticesCount();
     VertexID root_vertex = bfs_order[0];
-    order = new ui[query_vertices_num];
-    pivot = new ui[query_vertices_num];
+    order.resize(query_vertices_num);
+    pivot.resize(query_vertices_num);
     std::vector<bool> visited_vertices(query_vertices_num, false);
 
     std::vector<std::vector<ui>> core_paths;
@@ -431,8 +431,8 @@ void GenerateQueryPlan::generateCFLQueryPlan(const Graph *data_graph, const Grap
     }
 }
 
-void GenerateQueryPlan::generateRootToLeafPaths(TreeNode *tree_node, VertexID cur_vertex, std::vector<ui> &cur_path,
-                                                std::vector<std::vector<ui>> &paths) {
+void GenerateQueryPlan::generateRootToLeafPaths(TreeNodeArray &tree_node, VertexID cur_vertex, std::vector<ui> &cur_path,
+                                                UIntMatrix &paths) {
     TreeNode& cur_node = tree_node[cur_vertex];
     cur_path.push_back(cur_vertex);
 
@@ -449,7 +449,7 @@ void GenerateQueryPlan::generateRootToLeafPaths(TreeNode *tree_node, VertexID cu
     cur_path.pop_back();
 }
 
-void GenerateQueryPlan::estimatePathEmbeddsingsNum(std::vector<ui> &path, Edges ***edge_matrix,
+void GenerateQueryPlan::estimatePathEmbeddsingsNum(UIntArray &path, EdgesPtrMatrix &edge_matrix,
                                                    std::vector<size_t> &estimated_embeddings_num) {
     assert(path.size() > 1);
     std::vector<size_t> parent;
@@ -492,7 +492,7 @@ void GenerateQueryPlan::estimatePathEmbeddsingsNum(std::vector<ui> &path, Edges 
     }
 }
 
-ui GenerateQueryPlan::generateNoneTreeEdgesCount(const Graph *query_graph, TreeNode *tree_node, std::vector<ui> &path) {
+ui GenerateQueryPlan::generateNoneTreeEdgesCount(const graph_ptr query_graph, TreeNodeArray &tree_node, UIntArray &path) {
     ui non_tree_edge_count = query_graph->getVertexDegree(path[0]) - tree_node[path[0]].children_count_;
 
     for (ui i = 1; i < path.size(); ++i) {
@@ -503,8 +503,8 @@ ui GenerateQueryPlan::generateNoneTreeEdgesCount(const Graph *query_graph, TreeN
     return non_tree_edge_count;
 }
 
-void GenerateQueryPlan::generateCorePaths(const Graph *query_graph, TreeNode *tree_node, VertexID cur_vertex,
-                                          std::vector<ui> &cur_core_path, std::vector<std::vector<ui>> &core_paths) {
+void GenerateQueryPlan::generateCorePaths(const graph_ptr query_graph, TreeNodeArray &tree_node, VertexID cur_vertex,
+                                          UIntArray &cur_core_path, UIntMatrix &core_paths) {
     TreeNode& node = tree_node[cur_vertex];
     cur_core_path.push_back(cur_vertex);
 
@@ -523,8 +523,8 @@ void GenerateQueryPlan::generateCorePaths(const Graph *query_graph, TreeNode *tr
     cur_core_path.pop_back();
 }
 
-void GenerateQueryPlan::generateTreePaths(const Graph *query_graph, TreeNode *tree_node, VertexID cur_vertex,
-                                          std::vector<ui> &cur_tree_path, std::vector<std::vector<ui>> &tree_paths) {
+void GenerateQueryPlan::generateTreePaths(const graph_ptr query_graph, TreeNodeArray &tree_node, VertexID cur_vertex,
+                                          UIntArray &cur_tree_path, UIntMatrix &tree_paths) {
     TreeNode& node = tree_node[cur_vertex];
     cur_tree_path.push_back(cur_vertex);
 
@@ -543,7 +543,7 @@ void GenerateQueryPlan::generateTreePaths(const Graph *query_graph, TreeNode *tr
     cur_tree_path.pop_back();
 }
 
-void GenerateQueryPlan::generateLeaves(const Graph *query_graph, std::vector<ui> &leaves) {
+void GenerateQueryPlan::generateLeaves(const graph_ptr query_graph, UIntArray &leaves) {
     for (ui i = 0; i < query_graph->getVerticesCount(); ++i) {
         VertexID cur_vertex = i;
         if (query_graph->getVertexDegree(cur_vertex) == 1) {
@@ -552,7 +552,7 @@ void GenerateQueryPlan::generateLeaves(const Graph *query_graph, std::vector<ui>
     }
 }
 
-void GenerateQueryPlan::checkQueryPlanCorrectness(const Graph *query_graph, ui *order, ui *pivot) {
+void GenerateQueryPlan::checkQueryPlanCorrectness(const graph_ptr query_graph, UIntArray &order, UIntArray &pivot) {
     ui query_vertices_num = query_graph->getVerticesCount();
     std::vector<bool> visited_vertices(query_vertices_num, false);
     // Check whether each query vertex is in the order.
@@ -581,7 +581,7 @@ void GenerateQueryPlan::checkQueryPlanCorrectness(const Graph *query_graph, ui *
     }
 }
 
-void GenerateQueryPlan::printQueryPlan(const Graph *query_graph, ui *order) {
+void GenerateQueryPlan::printQueryPlan(const graph_ptr query_graph, UIntArray &order) {
     ui query_vertices_num = query_graph->getVerticesCount();
     printf("Query Plan: ");
     for (ui i = 0; i < query_vertices_num; ++i) {
@@ -603,7 +603,7 @@ void GenerateQueryPlan::printQueryPlan(const Graph *query_graph, ui *order) {
     }
 }
 
-void GenerateQueryPlan::printSimplifiedQueryPlan(const Graph *query_graph, ui *order) {
+void GenerateQueryPlan::printSimplifiedQueryPlan(const graph_ptr query_graph, UIntArray &order) {
     ui query_vertices_num = query_graph->getVerticesCount();
     printf("Query Plan: ");
     for (ui i = 0; i < query_vertices_num; ++i) {
@@ -612,11 +612,11 @@ void GenerateQueryPlan::printSimplifiedQueryPlan(const Graph *query_graph, ui *o
     printf("\n");
 }
 
-void GenerateQueryPlan::generateDSPisoQueryPlan(const Graph *query_graph, Edges ***edge_matrix, ui *&order, ui *&pivot,
-                                                TreeNode *tree, ui *bfs_order, ui *candidates_count, ui **&weight_array) {
+void GenerateQueryPlan::generateDSPisoQueryPlan(const graph_ptr query_graph, EdgesPtrMatrix &edge_matrix, UIntArray &order, UIntArray &pivot,
+                                                TreeNodeArray &tree, UIntArray &bfs_order, UIntArray &candidates_count, UIntMatrix &weight_array) {
     ui query_vertices_num = query_graph->getVerticesCount();
-    order = new ui[query_vertices_num];
-    pivot = new ui[query_vertices_num];
+    order.resize(query_vertices_num);
+    pivot.resize(query_vertices_num);
 
     for (ui i = 0; i < query_vertices_num; ++i) {
         order[i] = bfs_order[i];
@@ -627,10 +627,10 @@ void GenerateQueryPlan::generateDSPisoQueryPlan(const Graph *query_graph, Edges 
     }
 
     // Compute weight array.
-    weight_array = new ui*[query_vertices_num];
+    weight_array.resize(query_vertices_num);
     for (ui i = 0; i < query_vertices_num; ++i) {
-        weight_array[i] = new ui[candidates_count[i]];
-        std::fill(weight_array[i], weight_array[i] + candidates_count[i], std::numeric_limits<ui>::max());
+        weight_array[i].resize(candidates_count[i], std::numeric_limits<ui>::max());
+        // std::fill(weight_array[i], weight_array[i] + candidates_count[i], std::numeric_limits<ui>::max());
     }
 
     for (int i = query_vertices_num - 1; i >= 0; --i) {
@@ -647,7 +647,7 @@ void GenerateQueryPlan::generateDSPisoQueryPlan(const Graph *query_graph, Edges 
                 Edges& cur_edge = *edge_matrix[vertex][child];
                 for (ui k = 0; k < candidates_count[vertex]; ++k) {
                     ui cur_candidates_count = cur_edge.offset_[k + 1] - cur_edge.offset_[k];
-                    ui* cur_candidates = cur_edge.edge_ + cur_edge.offset_[k];
+                    ui* cur_candidates = &cur_edge.edge_[0] + cur_edge.offset_[k];
 
                     ui weight = 0;
 
@@ -663,16 +663,17 @@ void GenerateQueryPlan::generateDSPisoQueryPlan(const Graph *query_graph, Edges 
         }
 
         if (set_to_one) {
-            std::fill(weight_array[vertex], weight_array[vertex] + candidates_count[vertex], 1);
+            weight_array[vertex].assign(candidates_count[vertex], 1);
+            // std::fill(weight_array[vertex], weight_array[vertex] + candidates_count[vertex], 1);
         }
     }
 }
 
-void GenerateQueryPlan::generateCECIQueryPlan(const Graph *query_graph, TreeNode *tree, ui *bfs_order, ui *&order,
-                                              ui *&pivot) {
+void GenerateQueryPlan::generateCECIQueryPlan(const graph_ptr query_graph, TreeNodeArray &tree, UIntArray &bfs_order, UIntArray &order,
+                                              UIntArray &pivot) {
     ui query_vertices_num = query_graph->getVerticesCount();
-    order = new ui[query_vertices_num];
-    pivot = new ui[query_vertices_num];
+    order.resize(query_vertices_num);
+    pivot .resize(query_vertices_num);
 
     for (ui i = 0; i < query_vertices_num; ++i) {
         order[i] = bfs_order[i];
@@ -683,10 +684,10 @@ void GenerateQueryPlan::generateCECIQueryPlan(const Graph *query_graph, TreeNode
     }
 }
 
-void GenerateQueryPlan::generateRIQueryPlan(const Graph *data_graph, const Graph *query_graph, ui *&order, ui *&pivot) {
+void GenerateQueryPlan::generateRIQueryPlan(const graph_ptr data_graph, const graph_ptr query_graph, UIntArray &order, UIntArray &pivot) {
     ui query_vertices_num = query_graph->getVerticesCount();
-    order = new ui[query_vertices_num];
-    pivot = new ui[query_vertices_num];
+    order.resize(query_vertices_num);
+    pivot.resize(query_vertices_num);
 
     std::vector<bool> visited(query_vertices_num, false);
     // Select the vertex with the maximum degree as the start vertex.
@@ -836,10 +837,10 @@ void GenerateQueryPlan::generateRIQueryPlan(const Graph *data_graph, const Graph
 }
 
 void
-GenerateQueryPlan::generateVF2PPQueryPlan(const Graph *data_graph, const Graph *query_graph, ui *&order, ui *&pivot) {
+GenerateQueryPlan::generateVF2PPQueryPlan(const graph_ptr data_graph, const graph_ptr query_graph, UIntArray &order, UIntArray &pivot) {
     ui query_vertices_num = query_graph->getVerticesCount();
-    order = new ui[query_vertices_num];
-    pivot = new ui[query_vertices_num];
+    order.resize(query_vertices_num);
+    pivot.resize(query_vertices_num);
 
     ui property_count = 0;
     std::vector<std::vector<ui>> properties(query_vertices_num);
@@ -883,8 +884,8 @@ GenerateQueryPlan::generateVF2PPQueryPlan(const Graph *data_graph, const Graph *
     in_matching_order[order[0]] = true;
 
     vertices.clear();
-    TreeNode* tree;
-    ui* bfs_order;
+    TreeNodeArray tree;
+    UIntArray bfs_order;
     GraphOperations::bfsTraversal(query_graph, order[0], tree, bfs_order);
 
 
@@ -940,13 +941,9 @@ GenerateQueryPlan::generateVF2PPQueryPlan(const Graph *data_graph, const Graph *
             vertices.erase(vertices.begin());
         }
     }
-
-
-    delete[] tree;
-    delete[] bfs_order;
 }
 
-void GenerateQueryPlan::generateOrderSpectrum(const Graph *query_graph, std::vector<std::vector<ui>> &spectrum,
+void GenerateQueryPlan::generateOrderSpectrum(const graph_ptr query_graph, UIntMatrix &spectrum,
                                               ui num_spectrum_limit) {
     ui query_vertices_num = query_graph->getVerticesCount();
 
@@ -1084,11 +1081,11 @@ void GenerateQueryPlan::generateOrderSpectrum(const Graph *query_graph, std::vec
 
     // Check the correctness of each matching order.
     for (auto& order : spectrum) {
-        checkQueryPlanCorrectness(query_graph, order.data());
+        checkQueryPlanCorrectness(query_graph, order);
     }
 }
 
-void GenerateQueryPlan::checkQueryPlanCorrectness(const Graph *query_graph, ui *order) {
+void GenerateQueryPlan::checkQueryPlanCorrectness(const graph_ptr query_graph, UIntArray &order) {
     ui query_vertices_num = query_graph->getVerticesCount();
     std::vector<bool> visited_vertices(query_vertices_num, false);
     // Check whether each query vertex is in the order.

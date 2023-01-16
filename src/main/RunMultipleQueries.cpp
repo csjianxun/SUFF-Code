@@ -19,38 +19,7 @@ namespace fs = std::filesystem;
 #define NANOSECTOSEC(elapsed_time) ((elapsed_time)/(double)1000000000)
 #define BYTESTOMB(memory_cost) ((memory_cost)/(double)(1024 * 1024))
 
-size_t enumerate(graph_ptr data_graph, graph_ptr query_graph, EdgesPtrMatrix &edge_matrix, UIntMatrix &candidates, UIntArray &candidates_count,
-                UIntArray &matching_order, size_t output_limit) {
-    static ui order_id = 0;
-
-    order_id += 1;
-
-    auto start = std::chrono::high_resolution_clock::now();
-    size_t call_count = 0;
-    size_t embedding_count = EvaluateQuery::LFTJ(data_graph, query_graph, edge_matrix, candidates, candidates_count,
-                               matching_order, output_limit, call_count);
-
-    auto end = std::chrono::high_resolution_clock::now();
-    double enumeration_time_in_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-#ifdef SPECTRUM
-    if (EvaluateQuery::exit_) {
-        printf("Spectrum Order %u status: Timeout\n", order_id);
-    }
-    else {
-        printf("Spectrum Order %u status: Complete\n", order_id);
-    }
-#endif
-    printf("Spectrum Order %u Enumerate time (seconds): %.4lf\n", order_id, NANOSECTOSEC(enumeration_time_in_ns));
-    printf("Spectrum Order %u #Embeddings: %zu\n", order_id, embedding_count);
-    printf("Spectrum Order %u Call Count: %zu\n", order_id, call_count);
-    printf("Spectrum Order %u Per Call Count Time (nanoseconds): %.4lf\n", order_id, enumeration_time_in_ns / (call_count == 0 ? 1 : call_count));
-
-    return embedding_count;
-}
-
-int main(int argc, char** argv) {
-    MatchingCommand command(argc, argv);
-    std::string input_query_graph_file = command.getQueryGraphFilePath();
+void execute_query(MatchingCommand &command, graph_ptr data_graph, graph_ptr query_graph, std::string input_query_graph_file) {
     std::string input_data_graph_file = command.getDataGraphFilePath();
     std::string input_filter_type = command.getFilterType();
     std::string input_order_type = command.getOrderType();
@@ -66,60 +35,7 @@ int main(int argc, char** argv) {
     std::string input_suff_alpha = command.getSUFFAlpha();
     bool use_cache = command.getUseCache();
     std::string input_suff_selector = command.getSUFFSelector();
-    /**
-     * Output the command line information.
-     */
-    std::cout << "Command Line:" << std::endl;
-    std::cout << "\tData Graph CSR: " << input_csr_file_path << std::endl;
-    std::cout << "\tData Graph: " << input_data_graph_file << std::endl;
-    std::cout << "\tQuery Graph: " << input_query_graph_file << std::endl;
-    std::cout << "\tFilter Type: " << input_filter_type << std::endl;
-    std::cout << "\tOrder Type: " << input_order_type << std::endl;
-    std::cout << "\tEngine Type: " << input_engine_type << std::endl;
-    std::cout << "\tOutput Limit: " << input_max_embedding_num << std::endl;
-    std::cout << "\tTime Limit (seconds): " << input_time_limit << std::endl;
-    std::cout << "\tOrder Num: " << input_order_num << std::endl;
-    std::cout << "\tDistribution File Path: " << input_distribution_file_path << std::endl;
-    std::cout << "\tSUFF Directory: " << input_suff_dir << std::endl;
-    std::cout << "\tSUFF K: " << input_suff_k << std::endl;
-    std::cout << "\tCreate Filter: " << create_filter << std::endl;
-    std::cout << "--------------------------------------------------------------------" << std::endl;
-
-    /**
-     * Load input graphs.
-     */
-    std::cout << "Load graphs..." << std::endl;
-
-    auto start = std::chrono::high_resolution_clock::now();
-
-    graph_ptr query_graph = std::make_shared<Graph>(true);
-    query_graph->loadGraphFromFile(input_query_graph_file);
-    query_graph->buildCoreTable();
-
-    graph_ptr data_graph = std::make_shared<Graph>(true);
-
-    if (input_csr_file_path.empty()) {
-        data_graph->loadGraphFromFile(input_data_graph_file);
-    }
-    else {
-        std::string degree_file_path = input_csr_file_path + "_deg.bin";
-        std::string edge_file_path = input_csr_file_path + "_adj.bin";
-        std::string label_file_path = input_csr_file_path + "_label.bin";
-        data_graph->loadGraphFromFileCompressed(degree_file_path, edge_file_path, label_file_path);
-    }
-
-    auto end = std::chrono::high_resolution_clock::now();
-
-    double load_graphs_time_in_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
-
-    std::cout << "-----" << std::endl;
-    std::cout << "Query Graph Meta Information" << std::endl;
-    query_graph->printGraphMetaData();
-    std::cout << "-----" << std::endl;
-    data_graph->printGraphMetaData();
-
-    std::cout << "--------------------------------------------------------------------" << std::endl;
-
+    
     /**
      * Start queries.
      */
@@ -128,7 +44,7 @@ int main(int argc, char** argv) {
     std::cout << "-----" << std::endl;
     std::cout << "Filter candidates..." << std::endl;
 
-    start = std::chrono::high_resolution_clock::now();
+    auto start = std::chrono::high_resolution_clock::now();
 
     UIntMatrix candidates;
     UIntArray candidates_count;
@@ -181,7 +97,7 @@ int main(int argc, char** argv) {
     if (input_filter_type != "CECI")
         FilterVertices::sortCandidates(candidates, candidates_count, query_graph->getVerticesCount());
 
-    end = std::chrono::high_resolution_clock::now();
+    auto end = std::chrono::high_resolution_clock::now();
     double filter_vertices_time_in_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     // Compute the candidates false positive ratio.
@@ -200,7 +116,7 @@ int main(int argc, char** argv) {
     if (input_filter_type != "CECI") {
         edge_matrix.resize(query_graph->getVerticesCount());
         for (ui i = 0; i < query_graph->getVerticesCount(); ++i) {
-            edge_matrix[i].resize(query_graph->getVerticesCount());
+            edge_matrix[i].resize(query_graph->getVerticesCount(), nullptr);
         }
 
         BuildTable::buildTables(data_graph, query_graph, candidates, candidates_count, edge_matrix);
@@ -237,19 +153,19 @@ int main(int argc, char** argv) {
     } else if (input_order_type == "GQL") {
         GenerateQueryPlan::generateGQLQueryPlan(data_graph, query_graph, candidates_count, matching_order, pivots);
     } else if (input_order_type == "TSO") {
-        if (tso_tree.empty()) {
+        if (tso_tree.size() == 0) {
             GenerateFilteringPlan::generateTSOFilterPlan(data_graph, query_graph, tso_tree, tso_order);
         }
         GenerateQueryPlan::generateTSOQueryPlan(query_graph, edge_matrix, matching_order, pivots, tso_tree, tso_order);
     } else if (input_order_type == "CFL") {
-        if (cfl_tree.empty()) {
+        if (cfl_tree.size() == 0) {
             int level_count;
             UIntArray level_offset;
             GenerateFilteringPlan::generateCFLFilterPlan(data_graph, query_graph, cfl_tree, cfl_order, level_count, level_offset);
         }
         GenerateQueryPlan::generateCFLQueryPlan(data_graph, query_graph, edge_matrix, matching_order, pivots, cfl_tree, cfl_order, candidates_count);
     } else if (input_order_type == "DPiso") {
-        if (dpiso_tree.empty()) {
+        if (dpiso_tree.size() == 0) {
             GenerateFilteringPlan::generateDPisoFilterPlan(data_graph, query_graph, dpiso_tree, dpiso_order);
         }
 
@@ -304,7 +220,7 @@ int main(int argc, char** argv) {
         fs::path graph_name(input_csr_file_path.substr(input_csr_file_path.rfind('/') + 1));
         suff::FilterManager::Init(root_dir, graph_name, create_filter, 0.01, input_suff_selector);
     }
-    // std::vector<VertexID> _matching_order(matching_order, matching_order + query_graph->getVerticesCount());
+    // std::vector<VertexID> _matching_order(matching_order.begin(), matching_order. + query_graph->getVerticesCount());
     // std::vector<VertexID> _pivot(pivots, pivots + query_graph->getVerticesCount());
     suff::FilterManager::CreateFilters(data_graph, input_query_graph_file, query_graph, matching_order);
 
@@ -326,7 +242,7 @@ int main(int argc, char** argv) {
     printf("Filter Removal time (seconds): %.4lf\n", NANOSECTOSEC(filterremoval_time_in_ns));
 
     if (input_suff_alpha != "") {
-        return 0;  // alpha > 0, only compute filter cache
+        return;  // alpha > 0, only compute filter cache
     }
     start = std::chrono::high_resolution_clock::now();
     
@@ -370,9 +286,6 @@ int main(int argc, char** argv) {
 //                                                           weight_array, dpiso_order, output_limit,
 //                                                           call_count);
     }
-    // else if (input_engine_type == "Spectrum") {
-    //     spectrum_analysis(data_graph, query_graph, edge_matrix, candidates, candidates_count, output_limit, spectrum, time_limit);
-    // }
     else if (input_engine_type == "CECI") {
         embedding_count = EvaluateQuery::exploreCECIStyle(data_graph, query_graph, ceci_tree, candidates, candidates_count, TE_Candidates,
                 NTE_Candidates, ceci_order, output_limit, call_count);
@@ -411,6 +324,9 @@ int main(int argc, char** argv) {
         std::cout << suff::FilterManager::total_fail[i] << " ";
     }
     std::cout << std::endl;
+
+    // release memory
+    suff::FilterManager::Init("", "");
 #endif
     std::cout << "--------------------------------------------------------------------" << std::endl;
     std::cout << "Release memories..." << std::endl;
@@ -422,7 +338,6 @@ int main(int argc, char** argv) {
     double preprocessing_time_in_ns = filter_vertices_time_in_ns + build_table_time_in_ns + generate_query_plan_time_in_ns;
     double total_time_in_ns = preprocessing_time_in_ns + enumeration_time_in_ns;
 
-    printf("Load graphs time (seconds): %.4lf\n", NANOSECTOSEC(load_graphs_time_in_ns));
     printf("Filter vertices time (seconds): %.4lf\n", NANOSECTOSEC(filter_vertices_time_in_ns));
     printf("Build table time (seconds): %.4lf\n", NANOSECTOSEC(build_table_time_in_ns));
     printf("Generate query plan time (seconds): %.4lf\n", NANOSECTOSEC(generate_query_plan_time_in_ns));
@@ -434,5 +349,96 @@ int main(int argc, char** argv) {
     printf("Call Count: %zu\n", call_count);
     printf("Per Call Count Time (nanoseconds): %.4lf\n", enumeration_time_in_ns / (call_count == 0 ? 1 : call_count));
     std::cout << "End." << std::endl;
+}
+
+int main(int argc, char** argv) {
+    MatchingCommand command(argc, argv);
+    std::string input_query_graph_path = command.getQueryGraphFilePath();
+    std::string input_data_graph_file = command.getDataGraphFilePath();
+    std::string input_filter_type = command.getFilterType();
+    std::string input_order_type = command.getOrderType();
+    std::string input_engine_type = command.getEngineType();
+    std::string input_max_embedding_num = command.getMaximumEmbeddingNum();
+    std::string input_time_limit = command.getTimeLimit();
+    std::string input_order_num = command.getOrderNum();
+    std::string input_distribution_file_path = command.getDistributionFilePath();
+    std::string input_csr_file_path = command.getCSRFilePath();
+    std::string input_suff_dir = command.getSUFFDir();
+    std::string input_suff_k = command.getSUFFK();
+    bool create_filter = command.getCreateFilter();
+    std::string input_suff_alpha = command.getSUFFAlpha();
+    bool use_cache = command.getUseCache();
+    std::string input_suff_selector = command.getSUFFSelector();
+    /**
+     * Output the command line information.
+     */
+    std::cout << "Command Line:" << std::endl;
+    std::cout << "\tData Graph CSR: " << input_csr_file_path << std::endl;
+    std::cout << "\tData Graph: " << input_data_graph_file << std::endl;
+    std::cout << "\tQuery Path: " << input_query_graph_path << std::endl;
+    std::cout << "\tFilter Type: " << input_filter_type << std::endl;
+    std::cout << "\tOrder Type: " << input_order_type << std::endl;
+    std::cout << "\tEngine Type: " << input_engine_type << std::endl;
+    std::cout << "\tOutput Limit: " << input_max_embedding_num << std::endl;
+    std::cout << "\tTime Limit (seconds): " << input_time_limit << std::endl;
+    std::cout << "\tOrder Num: " << input_order_num << std::endl;
+    std::cout << "\tDistribution File Path: " << input_distribution_file_path << std::endl;
+    std::cout << "\tSUFF Directory: " << input_suff_dir << std::endl;
+    std::cout << "\tSUFF K: " << input_suff_k << std::endl;
+    std::cout << "\tCreate Filter: " << create_filter << std::endl;
+    std::cout << "--------------------------------------------------------------------" << std::endl;
+
+    /**
+     * Load input graphs.
+     */
+    std::cout << "Load graphs..." << std::endl;
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    graph_ptr data_graph = std::make_shared<Graph>(true);
+
+    if (input_csr_file_path.empty()) {
+        data_graph->loadGraphFromFile(input_data_graph_file);
+    }
+    else {
+        std::string degree_file_path = input_csr_file_path + "_deg.bin";
+        std::string edge_file_path = input_csr_file_path + "_adj.bin";
+        std::string label_file_path = input_csr_file_path + "_label.bin";
+        data_graph->loadGraphFromFileCompressed(degree_file_path, edge_file_path, label_file_path);
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+
+    double load_graphs_time_in_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    printf("Load graphs time (seconds): %.4lf\n", NANOSECTOSEC(load_graphs_time_in_ns));
+
+    /**
+     * Enumerate and execute queries.
+     */
+
+    std::vector<std::string> queries;
+    for (auto &entry : fs::directory_iterator(input_query_graph_path)) {
+        queries.emplace_back(entry.path().string());
+    }
+    std::sort(queries.begin(), queries.end());
+
+    for (auto &path : queries) {
+        if (path.rfind(".graph") == path.length() - 6) {
+            std::cout << "-----Query: " << path << "-----" << std::endl;
+            graph_ptr query_graph = std::make_shared<Graph>(true);
+            query_graph->loadGraphFromFile(path);
+            query_graph->buildCoreTable();
+            std::cout << "Query Graph Meta Information" << std::endl;
+            query_graph->printGraphMetaData();
+            if (query_graph->getVerticesCount() == 0 || query_graph->getEdgesCount() == 0 || query_graph->getGraphMinDegree() == 0
+                || query_graph->getEdgesCount() < query_graph->getVerticesCount()) {
+                std::cout << "invalid query graph, skip" << std::endl;
+                std::cout << "-----" << std::endl;
+            } else {
+                std::cout << "-----" << std::endl;
+                execute_query(command, data_graph, query_graph, path);
+            }
+        }
+    }
     return 0;
 }

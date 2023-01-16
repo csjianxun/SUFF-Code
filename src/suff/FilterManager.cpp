@@ -12,12 +12,11 @@ namespace suff {
     std::vector<Filter> FilterManager::new_filters;
     ui FilterManager::add_level;
     bool FilterManager::CREATE_FILTER;
+    std::string FilterManager::SELECTOR;
     std::map<std::string, std::vector<Filter>> FilterManager::loaded_filters;
     std::vector<VFilter> FilterManager::vfilters;
     std::vector<bool> FilterManager::is_check_vid;
     std::vector<int> FilterManager::vid2level;
-    moodycamel::ConcurrentQueue<VertexID*> FilterManager::queue;
-    std::vector<std::thread> FilterManager::thread_pool;
     bool FilterManager::stop = false;
     std::vector<std::atomic_llong> FilterManager::total_check;
     std::vector<std::atomic_llong> FilterManager::total_fail;

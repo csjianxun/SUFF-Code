@@ -20,7 +20,6 @@ set(MATCHING_SRC
 
 set(SUFF_SRC
     suff/bloom_filter.hpp
-    suff/concurrentqueue.h
     suff/Filter.hpp
     suff/FilterGenerator.hpp
     suff/VFilterGenerator.hpp
@@ -30,13 +29,19 @@ set(SUFF_SRC
 set(SUBGRAPH_MATCHING_FILE_LIST
     main/StudyPerformance.cpp)
 
+set(MULTI_QUERY_MATCHING_FILE_LIST
+    main/RunMultipleQueries.cpp)
+
 
 add_executable(smatch ${SUBGRAPH_MATCHING_FILE_LIST} ${SUFF_SRC} ${MATCHING_SRC} ${UTILITY_SRC} ${GRAPH_SRC})
 target_compile_definitions(smatch PUBLIC SUFF)
-target_link_libraries(smatch PUBLIC ${GPERFTOOLS_LIBRARIES})
 
 add_executable(smatch_dp ${SUBGRAPH_MATCHING_FILE_LIST} ${SUFF_SRC} ${MATCHING_SRC} ${UTILITY_SRC} ${GRAPH_SRC})
 target_compile_definitions(smatch_dp PUBLIC SUFF PUBLIC ENABLE_FAILING_SET)
-target_link_libraries(smatch_dp PUBLIC ${GPERFTOOLS_LIBRARIES})
 
-add_executable(test main/Test.cpp ${SUFF_SRC} ${UTILITY_SRC} ${GRAPH_SRC})
+add_executable(m-smatch ${MULTI_QUERY_MATCHING_FILE_LIST} ${SUFF_SRC} ${MATCHING_SRC} ${UTILITY_SRC} ${GRAPH_SRC})
+target_compile_definitions(m-smatch PUBLIC SUFF)
+
+add_executable(m-smatch_dp ${MULTI_QUERY_MATCHING_FILE_LIST} ${SUFF_SRC} ${MATCHING_SRC} ${UTILITY_SRC} ${GRAPH_SRC})
+target_compile_definitions(m-smatch_dp PUBLIC SUFF PUBLIC ENABLE_FAILING_SET)
+

@@ -27,7 +27,9 @@ enum OptionKeyword {
     SUFFDir = 15,           // -suff_dir, The directory storing SUFF filters
     SUFFK = 16,           // -suff_k, The max # filters to use
     CreateFilter = 17,           // -suff_k, The max # filters to use
-    SUFFAlpha = 18             // -suff_alpha, The alpha parameter
+    SUFFAlpha = 18,             // -suff_alpha, The alpha parameter
+    UseCache = 19,             // -use_cache, whether to allow reading cached filters
+    SUFFSelector = 20,             // -selector, which selection algorithm to use, either 'random' or 'greedy', default 'greedy'
 };
 
 class MatchingCommand : public CommandParser{
@@ -114,6 +116,14 @@ public:
 
     std::string getSUFFAlpha() {
         return options_value[OptionKeyword::SUFFAlpha];
+    }
+
+    bool getUseCache() {
+        return options_value[OptionKeyword::UseCache] == "" ? true : options_value[OptionKeyword::UseCache] == "true";
+    }
+
+    std::string getSUFFSelector() {
+        return options_value[OptionKeyword::SUFFSelector] == "" ? "greedy" : options_value[OptionKeyword::SUFFSelector];
     }
 };
 

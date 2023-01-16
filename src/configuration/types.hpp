@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <stdlib.h>
 #include <map>
+#include <vector>
+#include <memory>
 
 typedef unsigned int ui;
 
@@ -20,6 +22,11 @@ enum MatchingIndexType {
 };
 
 typedef std::map<VertexID, VertexID> VMapping;
+typedef std::vector<int> IntArray;
+typedef std::vector<ui> UIntArray;
+typedef std::vector<std::vector<ui>> UIntMatrix;
+typedef std::vector<std::vector<bool>> BoolMatrix;
+typedef std::vector<bool> BoolArray;
 
 class TreeNode {
 public:
@@ -30,18 +37,14 @@ public:
     ui children_count_;
     ui bn_count_;
     ui fn_count_;
-    VertexID* under_level_;
-    VertexID* children_;
-    VertexID* bn_;
-    VertexID* fn_;
+    UIntArray under_level_;
+    UIntArray children_;
+    UIntArray bn_;
+    UIntArray fn_;
     size_t estimated_embeddings_num_;
 public:
     TreeNode() {
         id_ = 0;
-        under_level_ = NULL;
-        bn_ = NULL;
-        fn_ = NULL;
-        children_ = NULL;
         parent_ = 0;
         level_ = 0;
         under_level_count_ = 0;
@@ -51,41 +54,33 @@ public:
         estimated_embeddings_num_ = 0;
     }
 
-    ~TreeNode() {
-        delete[] under_level_;
-        delete[] bn_;
-        delete[] fn_;
-        delete[] children_;
-    }
-
     void initialize(const ui size) {
-        under_level_ = new VertexID[size];
-        bn_ = new VertexID[size];
-        fn_ = new VertexID[size];
-        children_ = new VertexID[size];
+        under_level_.resize(size);
+        bn_.resize(size);
+        fn_.resize(size);
+        children_.resize(size);
     }
 };
 
+typedef std::vector<TreeNode> TreeNodeArray;
+
 class Edges {
 public:
-    ui* offset_;
-    ui* edge_;
+    UIntArray offset_;
+    UIntArray edge_;
     ui vertex_count_;
     ui edge_count_;
     ui max_degree_;
 public:
     Edges() {
-        offset_ = NULL;
-        edge_ = NULL;
         vertex_count_ = 0;
         edge_count_ = 0;
         max_degree_ = 0;
     }
-
-    ~Edges() {
-        delete[] offset_;
-        delete[] edge_;
-    }
 };
+
+typedef std::shared_ptr<Edges> EdgesPtr;
+
+typedef std::vector<std::vector<EdgesPtr>> EdgesPtrMatrix;
 
 #endif //SUBGRAPHMATCHING_TYPES_H
