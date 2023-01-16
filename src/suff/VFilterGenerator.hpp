@@ -12,7 +12,7 @@ namespace suff {
     class VFilterGenerator {
     public:
         static std::vector<VFilter> Generate(const graph_ptr q, const std::vector<VertexID> &matching_order,
-        std::map<std::string, std::vector<Filter>> &groups) {
+        std::map<std::string, std::vector<Filter>> &groups, std::vector<ui> &id2level) {
             std::vector<VFilter> results;
             // process each group (contains filters having the same pattern graph) separately
             for (auto &group: groups) {
@@ -28,10 +28,13 @@ namespace suff {
                 // for each mapping and each Filter, generate one VFilter
                 for (auto &f : group.second) {
                     for (auto &m: mappings) {
-                        // decide the filter vertex
-                        auto u = m.at(f.vid);
+                        // decide the filter level
+                        ui level = 0;
+                        for (auto v: f.vids) {
+                            level = std::max(level, id2level[m.at(v)]);
+                        }
                         // add to results
-                        results.emplace_back(f, m, u);
+                        results.emplace_back(f, m, level);
                     }
                 }
             }

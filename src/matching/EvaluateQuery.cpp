@@ -142,7 +142,7 @@ EvaluateQuery::exploreGraph(const graph_ptr data_graph, const graph_ptr query_gr
             if (cur_depth == max_depth - 1) {
                 embedding_cnt += 1;
                 found_embedding[cur_depth] = true;
-                suff::FilterManager::AddMatch(cur_depth, order[cur_depth], embedding[order[cur_depth]]);
+                suff::FilterManager::AddMatch(cur_depth, embedding);
 
                 visited_vertices[v] = false;
                 if (embedding_cnt >= output_limit_num) {
@@ -150,7 +150,7 @@ EvaluateQuery::exploreGraph(const graph_ptr data_graph, const graph_ptr query_gr
                 }
             } else
 #ifdef SUFF
-                if (suff::FilterManager::PassMatch(cur_depth, u, v))
+                if (suff::FilterManager::PassMatch(cur_depth, embedding))
 #endif
              {
                 call_count += 1;
@@ -177,7 +177,7 @@ EvaluateQuery::exploreGraph(const graph_ptr data_graph, const graph_ptr query_gr
             found_embedding[cur_depth] = found_embedding[cur_depth] || found_embedding[cur_depth+1];
 #ifdef SUFF
             if (found_embedding[cur_depth+1]) {
-                suff::FilterManager::AddMatch(cur_depth, order[cur_depth], embedding[order[cur_depth]]);
+                suff::FilterManager::AddMatch(cur_depth, embedding);
             }
 #endif
             visited_vertices[embedding[order[cur_depth]]] = false;
@@ -370,7 +370,7 @@ EvaluateQuery::LFTJ(const graph_ptr data_graph, const graph_ptr query_graph, Edg
             if (cur_depth == max_depth - 1) {
                 embedding_cnt += 1;
                 found_embedding[cur_depth] = true;
-                suff::FilterManager::AddMatch(cur_depth, u, v);
+                suff::FilterManager::AddMatch(cur_depth, embedding);
                 visited_vertices[v] = false;
 
 #ifdef DISTRIBUTION
@@ -387,7 +387,7 @@ EvaluateQuery::LFTJ(const graph_ptr data_graph, const graph_ptr query_graph, Edg
                 }
             } else
 #ifdef SUFF
-                if (suff::FilterManager::PassMatch(cur_depth, u, v))
+                if (suff::FilterManager::PassMatch(cur_depth, embedding))
 #endif
              {
                 call_count += 1;
@@ -429,7 +429,7 @@ EvaluateQuery::LFTJ(const graph_ptr data_graph, const graph_ptr query_graph, Edg
             VertexID u = order[cur_depth];
 #ifdef SUFF
             if (found_embedding[cur_depth+1]) {
-                suff::FilterManager::AddMatch(cur_depth, u, embedding[u]);
+                suff::FilterManager::AddMatch(cur_depth, embedding);
             }
 #endif
             
@@ -691,7 +691,7 @@ size_t EvaluateQuery::exploreGraphQLStyle(const graph_ptr data_graph, const grap
             if (cur_depth == max_depth - 1) {
                 embedding_cnt += 1;
                 found_embedding[cur_depth] = true;
-                suff::FilterManager::AddMatch(cur_depth, u, v);
+                suff::FilterManager::AddMatch(cur_depth, embedding);
 
                 visited_vertices[v] = false;
                 if (embedding_cnt >= output_limit_num) {
@@ -699,7 +699,7 @@ size_t EvaluateQuery::exploreGraphQLStyle(const graph_ptr data_graph, const grap
                 }
             } else
 #ifdef SUFF
-                if (suff::FilterManager::PassMatch(cur_depth, u, v))
+                if (suff::FilterManager::PassMatch(cur_depth, embedding))
 #endif
              {
                 call_count += 1;
@@ -725,7 +725,7 @@ size_t EvaluateQuery::exploreGraphQLStyle(const graph_ptr data_graph, const grap
             found_embedding[cur_depth] = found_embedding[cur_depth] || found_embedding[cur_depth+1];
 #ifdef SUFF
             if (found_embedding[cur_depth+1]) {
-                suff::FilterManager::AddMatch(cur_depth, order[cur_depth], embedding[order[cur_depth]]);
+                suff::FilterManager::AddMatch(cur_depth, embedding);
             }
 #endif
             visited_vertices[embedding[order[cur_depth]]] = false;
@@ -816,7 +816,7 @@ size_t EvaluateQuery::exploreQuickSIStyle(const graph_ptr data_graph, const grap
             if (cur_depth == max_depth - 1) {
                 embedding_cnt += 1;
                 found_embedding[cur_depth] = true;
-                suff::FilterManager::AddMatch(cur_depth, u, v);
+                suff::FilterManager::AddMatch(cur_depth, embedding);
 
                 visited_vertices[v] = false;
                 if (embedding_cnt >= output_limit_num) {
@@ -824,7 +824,7 @@ size_t EvaluateQuery::exploreQuickSIStyle(const graph_ptr data_graph, const grap
                 }
             } else
 #ifdef SUFF
-                if (suff::FilterManager::PassMatch(cur_depth, u, v))
+                if (suff::FilterManager::PassMatch(cur_depth, embedding))
 #endif
              {
                 call_count += 1;
@@ -850,7 +850,7 @@ size_t EvaluateQuery::exploreQuickSIStyle(const graph_ptr data_graph, const grap
             found_embedding[cur_depth] = found_embedding[cur_depth] || found_embedding[cur_depth+1];
 #ifdef SUFF
             if (found_embedding[cur_depth+1]) {
-                suff::FilterManager::AddMatch(cur_depth, order[cur_depth], embedding[order[cur_depth]]);
+                suff::FilterManager::AddMatch(cur_depth, embedding);
             }
 #endif
             visited_vertices[embedding[order[cur_depth]]] = false;
@@ -952,9 +952,9 @@ size_t EvaluateQuery::exploreDPisoStyle(const graph_ptr data_graph, const graph_
         VertexID v = candidates[start_vertex][i];
         embedding[start_vertex] = v;
 #ifdef SUFF
-                if (!suff::FilterManager::PassMatch(cur_depth, start_vertex, v)) {
-                    continue;
-                }
+                // if (!suff::FilterManager::PassMatch(cur_depth, start_vertex, v)) {
+                //     continue;
+                // }
 #endif
         idx_embedding[start_vertex] = i;
         visited_vertices[v] = true;
@@ -1010,8 +1010,9 @@ size_t EvaluateQuery::exploreDPisoStyle(const graph_ptr data_graph, const graph_
                 if (cur_depth == max_depth - 1) {
                     embedding_cnt += 1;
                     found_embedding[cur_depth] = true;
-                    suff::FilterManager::AddMatch(cur_depth, u, v);
-
+#ifdef SUFF
+                    // suff::FilterManager::AddMatch(cur_depth, u, v);
+#endif
                     visited_vertices[v] = false;
 #ifdef ENABLE_FAILING_SET
                     reverse_embedding.erase(embedding[u]);
@@ -1024,7 +1025,7 @@ size_t EvaluateQuery::exploreDPisoStyle(const graph_ptr data_graph, const graph_
                     }
                 } else
 #ifdef SUFF
-                if (suff::FilterManager::PassMatch(cur_depth, u, v))
+                // if (suff::FilterManager::PassMatch(cur_depth, u, v))
 #endif
                  {
                     call_count += 1;
@@ -1050,16 +1051,9 @@ size_t EvaluateQuery::exploreDPisoStyle(const graph_ptr data_graph, const graph_
 #endif
                 }
 #ifdef SUFF
-                else {
-                    visited_vertices[v] = false;
-// #ifdef ENABLE_FAILING_SET
-//                     if (idx_count[u] == 0) {
-//                         vec_failing_set[cur_depth - 1] = ancestors[u];
-//                     } else {
-//                         vec_failing_set[cur_depth - 1].reset();
-//                     }
-// #endif
-                }
+                // else {
+                    // visited_vertices[v] = false;
+                // }
 #endif
             }
 
@@ -1073,9 +1067,9 @@ size_t EvaluateQuery::exploreDPisoStyle(const graph_ptr data_graph, const graph_
             if (cur_depth >= 0) {
                 found_embedding[cur_depth] = found_embedding[cur_depth] || found_embedding[cur_depth+1];
 #ifdef SUFF
-                if (found_embedding[cur_depth+1]) {
-                    suff::FilterManager::AddMatch(cur_depth, u, embedding[u]);
-                }
+                // if (found_embedding[cur_depth+1]) {
+                //     suff::FilterManager::AddMatch(cur_depth, u, embedding[u]);
+                // }
 #endif
             }
 
@@ -1414,7 +1408,7 @@ EvaluateQuery::exploreCECIStyle(const graph_ptr data_graph, const graph_ptr quer
                 }
             } else
 #ifdef SUFF
-                if (suff::FilterManager::PassMatch(cur_depth, u, v))
+                if (suff::FilterManager::PassMatch(cur_depth, embedding))
 #endif
              {
                 call_count += 1;
@@ -1449,7 +1443,7 @@ EvaluateQuery::exploreCECIStyle(const graph_ptr data_graph, const graph_ptr quer
             VertexID u = order[cur_depth];
 #ifdef SUFF
             if (found_embedding[cur_depth+1]) {
-                suff::FilterManager::AddMatch(cur_depth, u, embedding[u]);
+                suff::FilterManager::AddMatch(cur_depth, embedding);
             }
 #endif
             

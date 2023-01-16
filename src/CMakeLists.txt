@@ -44,4 +44,3 @@ target_compile_definitions(m-smatch PUBLIC SUFF)
 
 add_executable(m-smatch_dp ${MULTI_QUERY_MATCHING_FILE_LIST} ${SUFF_SRC} ${MATCHING_SRC} ${UTILITY_SRC} ${GRAPH_SRC})
 target_compile_definitions(m-smatch_dp PUBLIC SUFF PUBLIC ENABLE_FAILING_SET)
-

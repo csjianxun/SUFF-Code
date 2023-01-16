@@ -28,7 +28,7 @@ namespace suff {
 
             std::vector<VFilter> results;
             for (auto i = 0ul; i < q->getVerticesCount(); i++) {
-                auto temp = selectKForV(q, matching_order, _vfilters, i, k);
+                auto temp = selectKForLevel(q, matching_order, _vfilters, i, k);
                 for (auto &f: temp) {
                     results.emplace_back(f);
                 }
@@ -45,7 +45,7 @@ namespace suff {
             
             std::vector<VFilter> results;
             for (auto i = 0ul; i < q->getVerticesCount(); i++) {
-                auto temp = selectRandomKForV(q, matching_order, vfilters, i, k);
+                auto temp = selectRandomKForLevel(q, matching_order, vfilters, i, k);
                 for (auto &f: temp) {
                     results.emplace_back(f);
                 }
@@ -102,10 +102,7 @@ namespace suff {
             double score = pattern->getEdgesCount();
             auto &mapping = f.mappings[0];
             std::set<VertexID> seen_vertices;
-            for (auto i = 0ul; i <= q->getVerticesCount(); i++) {
-                if (matching_order[i] == f.vid) {
-                    break;
-                }
+            for (auto i = 0ul; i <= f.check_level; i++) {
                 seen_vertices.emplace(matching_order[i]);
             }
             // enumerate edges seen in the filter's vertices, and for each deduct score by 1
@@ -120,12 +117,12 @@ namespace suff {
             return score;
         }
 
-        static std::vector<VFilter> selectKForV(const graph_ptr q, const std::vector<VertexID> &matching_order,
-         std::vector<VFilter> &candidates, VertexID v, long k) {
+        static std::vector<VFilter> selectKForLevel(const graph_ptr q, const std::vector<VertexID> &matching_order,
+         std::vector<VFilter> &candidates, ui level, long k) {
             std::vector<VFilter> result;
             std::vector<VFilter> _candidates;
             for (auto &f : candidates) {
-                if (f.vid == v) {
+                if (f.check_level == level) {
                     _candidates.emplace_back(f);
                 }
             }
@@ -150,10 +147,7 @@ namespace suff {
                 auto pattern = f.filters[0].pattern;
                 auto &mapping = f.mappings[0];
                 std::set<VertexID> seen_vertices;
-                for (auto i = 0ul; i <= q->getVerticesCount(); i++) {
-                    if (matching_order[i] == f.vid) {
-                        break;
-                    }
+                for (auto i = 0ul; i <= f.check_level; i++) {
                     seen_vertices.emplace(matching_order[i]);
                 }
                 cover_edges.emplace_back();
@@ -205,12 +199,12 @@ namespace suff {
             return result;
         }
 
-        static std::vector<VFilter> selectRandomKForV(const graph_ptr q, const std::vector<VertexID> &matching_order,
-         std::vector<VFilter> &candidates, VertexID v, long k) {
+        static std::vector<VFilter> selectRandomKForLevel(const graph_ptr q, const std::vector<VertexID> &matching_order,
+         std::vector<VFilter> &candidates, ui level, long k) {
             std::vector<VFilter> result;
             std::vector<VFilter> _candidates;
             for (auto &f : candidates) {
-                if (f.vid == v && result.size() < k) {
+                if (f.check_level == level && result.size() < k) {
                     result.emplace_back(f);
                 }
             }

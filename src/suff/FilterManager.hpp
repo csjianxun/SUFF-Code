@@ -5,6 +5,7 @@
 #include <vector>
 #include <filesystem>
 #include <atomic>
+#include <algorithm>
 #include "configuration/types.hpp"
 #include "graph/graph.h"
 #include "Filter.hpp"
@@ -32,78 +33,79 @@ namespace suff {
         static double FILTER_FPR;
         static fs::path root_folder;
         static fs::path graph_name;
-        static long pattern_size;
-        static long data_size;  // data graph size
-        static long max_size;  // max filter size
+        static ui pattern_size;
+        static ui data_size;  // data graph size
         // for creating filters
         static fs::path query_name;
         static std::vector<Filter> new_filters;
+        static std::vector<ui> buffer;
         static ui add_level;
-        static bool CREATE_FILTER;
+        static std::vector<ui> matching_order;
+        static ui FILTER_SIZE;  // filter bit array size in KB, 0 means do not create filters
         static std::string SELECTOR;
         // for using filters
         static std::map<std::string, std::vector<Filter>> loaded_filters;
         static std::vector<VFilter> vfilters;  // vfilters[i] stores vfilter at level i
-        static std::vector<bool> is_check_vid;  // check if level i has filter
-        static std::vector<int> vid2level;  // if vertex v has filter, this gives the level, otherwise gives -1
+        static std::vector<bool> is_check_level;  // check if level i has filter
+        static std::vector<ui> vid2level;  // if vertex v has filter, this gives the level, otherwise gives -1
         static bool stop;
         // for statistics
         static std::vector<std::atomic_llong> total_check;
         static std::vector<std::atomic_llong> total_fail;
-        static std::vector<std::vector<bool>> temp_valid_mapping;
-        static std::vector<std::uint64_t> temp_valid_mapping_count;
         static std::vector<u_int64_t> fail_count;
         static std::vector<u_int64_t> total_count;
         static graph_ptr data_graph;
         static graph_ptr query_graph;
 
-        static void Init(const fs::path &root_folder, const fs::path &graph_name, bool create_filter = false,
+        static void Init(const fs::path &root_folder, const fs::path &graph_name, ui filter_size = 0,
             double fpr = 0.01, std::string selector = "greedy") {
 
             FilterManager::root_folder = root_folder;
             FilterManager::graph_name = graph_name;
-            CREATE_FILTER = create_filter;
+            FILTER_SIZE = filter_size;
             FILTER_FPR = fpr;
             SELECTOR = selector;
             pattern_size = 0;
             data_size = 0;
-            max_size = 0;
             query_name = "";
             add_level = 0;
             new_filters.clear();
             loaded_filters.clear();
             vfilters.clear();
-            is_check_vid.clear();
+            is_check_level.clear();
             vid2level.clear();
             total_check.clear();
             total_fail.clear();
-            temp_valid_mapping.clear();
-            temp_valid_mapping_count.clear();
             fail_count.clear();
             total_count.clear();
             data_graph = nullptr;
             query_graph = nullptr;
+            matching_order.clear();
         }
 
         // create new empty filters to be filled later
-        static void CreateFilters(const graph_ptr d, const std::string &query_path, const graph_ptr q, const std::vector<VertexID> &matching_order) {
+        static void CreateFilters(const graph_ptr d, const std::string &query_path, const graph_ptr q, const std::vector<VertexID> &order) {
             data_graph = d;
             query_graph = q;
             pattern_size = q->getVerticesCount();
             data_size = d->getVerticesCount();
-            max_size = d->getGraphMaxLabelFrequency() / 10000;
+            matching_order.assign(order.begin(), order.end());
             FilterManager::query_name = query_path.substr(query_path.rfind('/') + 1);
             std::cout << "generating new filters..." << std::endl;
             new_filters = FilterGenerator::GenerateNewFilters(query_path, q, matching_order);
-            
-            std::cout << "creating temp vectors..." << std::endl;
-            for (std::size_t i = 0; i < q->getVerticesCount(); i++) {
-                temp_valid_mapping.emplace_back(d->getVerticesCount(), false);
-                temp_valid_mapping_count.emplace_back(0);
+            for (auto &f: new_filters) {
+                f.init_filter(FILTER_SIZE);
             }
-
+            // std::cout << "creating temp vectors..." << std::endl;
+            // for (std::size_t i = 0; i < q->getVerticesCount(); i++) {
+            //     temp_valid_mapping.emplace_back(d->getVerticesCount(), false);
+            //     temp_valid_mapping_count.emplace_back(0);
+            // }
+            
             fail_count = std::vector<u_int64_t>(pattern_size, 0);
             total_count = std::vector<u_int64_t>(pattern_size, 0);
+            add_level = std::min(matching_order.size(), 3ul);
+            buffer.resize(add_level);
         }
 
         // load some existing filters to be used later
@@ -111,12 +113,12 @@ namespace suff {
             const std::vector<VertexID> &pivot, long k) {
 
             pattern_size = q->getVerticesCount();
-            is_check_vid.resize(pattern_size, false);  // max check level is #vertices - 1
+            is_check_level.resize(pattern_size, false);  // max check level is #vertices - 1
             vid2level.resize(pattern_size, -1);
             vfilters.resize(pattern_size);
             total_check = std::vector<std::atomic_llong>(pattern_size);
             total_fail = std::vector<std::atomic_llong>(pattern_size);
-            for (auto i = 0; i < pattern_size; i++) {
+            for (ui i = 0; i < pattern_size; i++) {
                 total_check[i] = 0;
                 total_fail[i] = 0;
             }
@@ -124,7 +126,10 @@ namespace suff {
                 return;
             }
             std::cout << "generating vfilters..." << std::endl;
-            auto initial_vfilters = VFilterGenerator::Generate(q, matching_order, loaded_filters);
+            for (ui i = 0; i < matching_order.size(); i++) {
+                vid2level[matching_order[i]] = i;
+            }
+            auto initial_vfilters = VFilterGenerator::Generate(q, matching_order, loaded_filters, vid2level);
             std::cout << "# initial vfilters: " << initial_vfilters.size() << std::endl;
             std::vector<VFilter> selected_vfilters;
             if (SELECTOR == "greedy") {
@@ -138,21 +143,21 @@ namespace suff {
             // group vfilters by level
             std::cout << "grouping and loading filter data..." << std::endl;
             for (auto &f: selected_vfilters) {
-                is_check_vid[f.vid] = true;
+                is_check_level[f.check_level] = true;
             }
-            std::cout << "check vids: [";
+            std::cout << "check levels: [";
             for (auto i = 0ul; i < pattern_size; i++) {
-                if (is_check_vid[i]) {
+                if (is_check_level[i]) {
                     std::cout << " " << i;
                     std::vector<Filter> filters;
-                    // std::vector<VMapping> mappings;
+                    std::vector<VMapping> mappings;
                     for (auto &f: selected_vfilters) {
-                        if (f.vid == i) {
+                        if (f.check_level == i) {
                             filters.emplace_back(f.filters[0]);
-                            // mappings.emplace_back(f.mappings[0]);
+                            mappings.emplace_back(f.mappings[0]);
                         }
                     }
-                    vfilters[i] = VFilter(filters, i);
+                    vfilters[i] = VFilter(filters, mappings, i);
                     // load filter data
                     vfilters[i].load_data();
                 }
@@ -161,21 +166,41 @@ namespace suff {
 
         }
 
-        // for dynamic matching order, using vid(u) to check
-        static inline bool PassMatch(long level, VertexID u, VertexID v) {
-            if (!is_check_vid[u] || level >= pattern_size - 5) {
+        static inline bool PassMatch(ui level, UIntArray &embedding) {
+            if (!is_check_level[level] || level >= pattern_size - 5) {
                 return true;
             }
-            bool pass = vfilters[u].contains(v);
+
+            bool pass = vfilters[level].contains(embedding);
             
             total_check[level]++;
-            total_fail[level]+= !pass;
+            total_fail[level] += !pass;
             return pass;
         }
 
-        static inline void AddMatch(long level, VertexID u, VertexID v) {
-            temp_valid_mapping_count[u] += !temp_valid_mapping[u][v];
-            temp_valid_mapping[u][v] = true;
+        // for dynamic matching order, using vid(u) to check
+        // static inline bool PassMatch(long level, UIntArray &order, UIntArray &embedding) {
+        //     if (level >= pattern_size - 5) {
+        //         return true;
+        //     }
+
+        //     bool pass = vfilters[u].contains(v);
+            
+        //     total_check[level]++;
+        //     total_fail[level]+= !pass;
+        //     return pass;
+        // }
+
+        // add embeddings to filters
+        static inline void AddMatch(ui level, UIntArray &embedding) {
+            if (level == add_level) {
+                for (auto &f: new_filters) {
+                    for (ui i = 0; i < f.v_num; i++) {
+                        buffer[i] = embedding[f.vids[i]];
+                    }
+                    f.add(buffer);
+                }
+            }
         }
 
         static void LoadFilters(bool use_cache=true) {
@@ -215,7 +240,7 @@ namespace suff {
                 }
             }
             std::cout << "# loaded filters: " << num_loaded << std::endl;
-            if (!CREATE_FILTER) {
+            if (FILTER_SIZE == 0) {  // not creating filters
                 WriteFilterCache();
             }
         }
@@ -264,7 +289,7 @@ namespace suff {
         }
 
         static void Dump() {
-            if (!CREATE_FILTER) {
+            if (FILTER_SIZE == 0) {
                 return;
             }
             std::string sub_folder = root_folder / graph_name / query_name;
@@ -272,18 +297,19 @@ namespace suff {
                 fs::create_directories(sub_folder);
             }
 
-            for (auto i = 0ul; i < temp_valid_mapping.size(); i++) {
-                new_filters[i].init_filter(max_size);
-                new_filters[i].filtering_ratio = ((double) temp_valid_mapping_count[i]) / data_graph->getLabelsFrequency(query_graph->getVertexLabel(i));
-                for (auto v = 0ul; v < data_size; v++) {
-                    if (temp_valid_mapping[i][v]) {
-                        new_filters[i].add(v);
-                    }
-                }
-            }
-            if (CREATE_FILTER) {
+            // for (auto i = 0ul; i < temp_valid_mapping.size(); i++) {
+            //     new_filters[i].init_filter(FILTER_SIZE);
+            //     new_filters[i].filtering_ratio = ((double) temp_valid_mapping_count[i]) / data_graph->getLabelsFrequency(query_graph->getVertexLabel(i));
+            //     for (auto v = 0ul; v < data_size; v++) {
+            //         if (temp_valid_mapping[i][v]) {
+            //             new_filters[i].add(v);
+            //         }
+            //     }
+            // }
+            if (FILTER_SIZE > 0) {
+                ui count = 0;
                 for (auto &f: new_filters) {
-                    std::string prefix = std::to_string(f.vid);
+                    std::string prefix = std::to_string(count++);
                     if (f.bf.effective_fpp() <= FILTER_FPR) {
                         f.dump(sub_folder / fs::path(prefix));
                         std::cout << "fpp is ok: " << f.bf.effective_fpp() << std::endl;
@@ -355,7 +381,17 @@ namespace suff {
                         auto matches = VFilterGenerator::Match(fr.pattern, fo.pattern);
                         bool dominate = false;
                         for (auto &m : matches) {
-                            dominate |= m.at(fo.vid) == fr.vid;
+                            bool _dominate = true;
+                            for (auto v: fo.vids) {
+                                if (std::find(fr.vids.begin(), fr.vids.end(), m.at(v)) == fr.vids.end()) {
+                                    _dominate = false;
+                                    break;
+                                }
+                            }
+                            if (_dominate) {
+                                dominate = true;
+                                break;
+                            }
                         }
                         if (dominate) {
                             // debug

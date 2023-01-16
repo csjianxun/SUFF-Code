@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
     std::string input_csr_file_path = command.getCSRFilePath();
     std::string input_suff_dir = command.getSUFFDir();
     std::string input_suff_k = command.getSUFFK();
-    bool create_filter = command.getCreateFilter();
+    ui filter_size = std::stoi(command.getFilterSize());
     std::string input_suff_alpha = command.getSUFFAlpha();
     bool use_cache = command.getUseCache();
     std::string input_suff_selector = command.getSUFFSelector();
@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
     std::cout << "\tDistribution File Path: " << input_distribution_file_path << std::endl;
     std::cout << "\tSUFF Directory: " << input_suff_dir << std::endl;
     std::cout << "\tSUFF K: " << input_suff_k << std::endl;
-    std::cout << "\tCreate Filter: " << create_filter << std::endl;
+    std::cout << "\tFilter Size: " << filter_size << std::endl;
     std::cout << "--------------------------------------------------------------------" << std::endl;
 
     /**
@@ -299,10 +299,10 @@ int main(int argc, char** argv) {
     fs::path root_dir(input_suff_dir);
     if (input_csr_file_path.empty()) {
         fs::path graph_name(input_data_graph_file.substr(input_data_graph_file.rfind('/') + 1));
-        suff::FilterManager::Init(root_dir, graph_name, create_filter, 0.01, input_suff_selector);
+        suff::FilterManager::Init(root_dir, graph_name, filter_size, 0.01, input_suff_selector);
     } else {
         fs::path graph_name(input_csr_file_path.substr(input_csr_file_path.rfind('/') + 1));
-        suff::FilterManager::Init(root_dir, graph_name, create_filter, 0.01, input_suff_selector);
+        suff::FilterManager::Init(root_dir, graph_name, filter_size, 0.01, input_suff_selector);
     }
     // std::vector<VertexID> _matching_order(matching_order, matching_order + query_graph->getVerticesCount());
     // std::vector<VertexID> _pivot(pivots, pivots + query_graph->getVerticesCount());

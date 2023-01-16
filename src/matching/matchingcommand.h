@@ -26,7 +26,7 @@ enum OptionKeyword {
     CSRFilePath = 14,                    // -csr, The input csr file path
     SUFFDir = 15,           // -suff_dir, The directory storing SUFF filters
     SUFFK = 16,           // -suff_k, The max # filters to use
-    CreateFilter = 17,           // -suff_k, The max # filters to use
+    FilterSize = 17,           // -suff_size, The filter size
     SUFFAlpha = 18,             // -suff_alpha, The alpha parameter
     UseCache = 19,             // -use_cache, whether to allow reading cached filters
     SUFFSelector = 20,             // -selector, which selection algorithm to use, either 'random' or 'greedy', default 'greedy'
@@ -110,8 +110,8 @@ public:
         return options_value[OptionKeyword::SUFFK] == "" ? "2" : options_value[OptionKeyword::SUFFK];
     }
 
-    bool getCreateFilter() {
-        return options_value[OptionKeyword::CreateFilter] == "" ? false : true;
+    std::string getFilterSize() {
+        return options_value[OptionKeyword::FilterSize] == "" ? "0" : options_value[OptionKeyword::FilterSize];
     }
 
     std::string getSUFFAlpha() {

@@ -23,7 +23,7 @@ MatchingCommand::MatchingCommand(const int argc, char **argv) : CommandParser(ar
     options_key[OptionKeyword::CSRFilePath] = "-csr";
     options_key[OptionKeyword::SUFFDir] = "-suff_dir";
     options_key[OptionKeyword::SUFFK] = "-suff_k";
-    options_key[OptionKeyword::CreateFilter] = "-createf";
+    options_key[OptionKeyword::FilterSize] = "-filter_size";
     options_key[OptionKeyword::SUFFAlpha] = "-alpha";
     options_key[OptionKeyword::UseCache] = "-use_cache";
     options_key[OptionKeyword::SUFFSelector] = "-selector";
@@ -82,8 +82,8 @@ void MatchingCommand::processOptions() {
     // SUFF max # filters
     options_value[OptionKeyword::SUFFK] = getCommandOption(options_key[OptionKeyword::SUFFK]);
 
-    // create filters
-    options_value[OptionKeyword::CreateFilter] = getCommandOption(options_key[OptionKeyword::CreateFilter]);
+    // filter sizes
+    options_value[OptionKeyword::FilterSize] = getCommandOption(options_key[OptionKeyword::FilterSize]);
 
     // alpha
     options_value[OptionKeyword::SUFFAlpha] = getCommandOption(options_key[OptionKeyword::SUFFAlpha]);

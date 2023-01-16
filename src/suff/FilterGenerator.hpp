@@ -21,9 +21,12 @@ namespace suff {
         static std::vector<Filter> GenerateNewFilters(const std::string &query_path, const graph_ptr query,
          const std::vector<VertexID> &matching_order) {
             std::vector<Filter> filters;
-            for (auto i = 0ul; i < query->getVerticesCount(); i++) {
-                // because of the dynamic order, only use 1 vertex to check
-                filters.emplace_back(query_path, i);
+            ui max_level = std::min(3ul, query->getVerticesCount() - 1ul);
+            for (auto i = 0ul; i < max_level; i++) {
+                filters.emplace_back(query_path, std::vector<ui>(1, i));
+                if (i > 1) {
+                    filters.emplace_back(query_path, std::vector<ui>(matching_order.begin(), matching_order.begin() + i));
+                }
             }
             return filters;
         }
