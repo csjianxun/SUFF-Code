@@ -1,5 +1,8 @@
 # SUFF
 Code of the SUFF framework
+
+The code of underlying subgraph matching algorithms is adopted from [RapidsAtHKUST/SubgraphMatching](https://github.com/RapidsAtHKUST/SubgraphMatching).
+
 ## Compile
 It requires CMake, g++11, and gperftools to compile, please be sure to install them in your system.
 Then just run build.sh to compile the code.
